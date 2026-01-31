@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="CMakeProjectFlavorService">
+    <option name="flavorId" value="CMakePlainProjectFlavor" />
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" ENABLED="true" CONFIG_NAME="Debug" />
+    </configurations>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="99c6744c-f731-4f41-8b58-f71169fab13e" name="Changes" comment="zaaaaaaaaaaaaaaaaaaaaaaadaaaaaaaaaaaaaannnnnnnnnnnnnnnnnn" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ChangesViewManager" show_ignored="true">
+    <option name="groupingKeys">
+      <option value="directory" />
+      <option value="repository" />
+    </option>
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "history": [
+    {
+      "state": "OPEN",
+      "author": "alirezan-norouzi"
+    },
+    {
+      "state": "OPEN",
+      "reviewState": "AWAITING_REVIEW"
+    },
+    {
+      "state": "OPEN"
+    }
+  ],
+  "lastFilter": {}
+}]]></component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/shahvin17/proje-mabani.git&quot;,
+    &quot;accountId&quot;: &quot;ea41588c-bb63-4169-92ca-812a8a416757&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5
+}</component>
+  <component name="ProjectId" id="38yeoFq1mhpAMVp8oVJfX4SKkZh" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "git-widget-placeholder": "main",
+    "ignore.virus.scanning.warn.message": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="99c6744c-f731-4f41-8b58-f71169fab13e" name="Changes" comment="" />
+      <created>1769776410474</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1769776410474</updated>
+      <workItem from="1769776411779" duration="26000" />
+      <workItem from="1769777104636" duration="16000" />
+      <workItem from="1769786355121" duration="6000" />
+      <workItem from="1769860978615" duration="27000" />
+      <workItem from="1769861016568" duration="71000" />
+      <workItem from="1769861129349" duration="82000" />
+      <workItem from="1769861230825" duration="31000" />
+      <workItem from="1769863616793" duration="806000" />
+    </task>
+    <task id="LOCAL-00001" summary="zaaaaaaaaaaaaaaaaaaaaaaadaaaaaaaaaaaaaannnnnnnnnnnnnnnnnn">
+      <option name="closed" value="true" />
+      <created>1769863771343</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1769863771343</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="zaaaaaaaaaaaaaaaaaaaaaaadaaaaaaaaaaaaaannnnnnnnnnnnnnnnnn" />
+    <option name="LAST_COMMIT_MESSAGE" value="zaaaaaaaaaaaaaaaaaaaaaaadaaaaaaaaaaaaaannnnnnnnnnnnnnnnnn" />
+  </component>
+</project>
