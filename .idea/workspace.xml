@@ -3,8 +3,19 @@
   <component name="AutoImportSettings">
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
+  <component name="CMakePresetLoader">{
+  &quot;useNewFormat&quot;: true
+}</component>
   <component name="CMakeProjectFlavorService">
     <option name="flavorId" value="CMakePlainProjectFlavor" />
+  </component>
+  <component name="CMakeReloadState">
+    <option name="reloaded" value="true" />
+  </component>
+  <component name="CMakeRunConfigurationManager">
+    <generated>
+      <config projectName="proje_mabani" targetName="proje_mabani" />
+    </generated>
   </component>
   <component name="CMakeSettings">
     <configurations>
@@ -12,7 +23,14 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="99c6744c-f731-4f41-8b58-f71169fab13e" name="Changes" comment="zaaaaaaaaaaaaaaaaaaaaaaadaaaaaaaaaaaaaannnnnnnnnnnnnnnnnn" />
+    <list default="true" id="99c6744c-f731-4f41-8b58-f71169fab13e" name="Changes" comment="kkkkkkkkk">
+      <change afterPath="$PROJECT_DIR$/tamrin7test.cu" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tamrin7test.cuh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tttttttttttttttttt7.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/proje-mabani.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/proje-mabani.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/testtttttttttt.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/testtttttttttt.cpp" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -27,7 +45,39 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug" />
   <component name="Git.Settings">
+    <excluded-from-favorite>
+      <branch-storage>
+        <map>
+          <entry type="LOCAL">
+            <value>
+              <list>
+                <branch-info repo="$PROJECT_DIR$" source="main" />
+              </list>
+            </value>
+          </entry>
+        </map>
+      </branch-storage>
+    </excluded-from-favorite>
+    <favorite-branches>
+      <branch-storage>
+        <map>
+          <entry type="LOCAL">
+            <value>
+              <list>
+                <branch-info repo="$PROJECT_DIR$" source="ttttttttteeeeeeeeeeeeeeeeesssssssssssssstttttttttt" />
+              </list>
+            </value>
+          </entry>
+        </map>
+      </branch-storage>
+    </favorite-branches>
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="main" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="GitHubPullRequestSearchHistory"><![CDATA[{
@@ -42,6 +92,9 @@
     },
     {
       "state": "OPEN"
+    },
+    {
+      "author": "alirezan-norouzi"
     }
   ],
   "lastFilter": {}
@@ -52,6 +105,12 @@
     &quot;accountId&quot;: &quot;ea41588c-bb63-4169-92ca-812a8a416757&quot;
   }
 }</component>
+  <component name="ProjectApplicationVersion">
+    <option name="ide" value="CLion" />
+    <option name="majorVersion" value="2025" />
+    <option name="minorVersion" value="2" />
+    <option name="productBranch" value="Classic" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 5
 }</component>
@@ -62,23 +121,39 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "CMake Application.proje_mabani.executor": "Run",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.cidr.known.project.marker": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "RunOnceActivity.west.config.association.type.startup.service": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "tt2",
     "ignore.virus.scanning.warn.message": "true",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "vcs.Git",
+    "structure.view.defaults.are.configured": "true",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RunManager">
+    <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="CLION.EXTERNAL.BUILD" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="proje_mabani" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="proje_mabani" TARGET_NAME="proje_mabani" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="proje_mabani" RUN_TARGET_NAME="proje_mabani">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="99c6744c-f731-4f41-8b58-f71169fab13e" name="Changes" comment="" />
@@ -94,6 +169,16 @@
       <workItem from="1769861129349" duration="82000" />
       <workItem from="1769861230825" duration="31000" />
       <workItem from="1769863616793" duration="806000" />
+      <workItem from="1769867231005" duration="1904000" />
+      <workItem from="1769870159491" duration="1441000" />
+      <workItem from="1769871922839" duration="1255000" />
+      <workItem from="1769874410425" duration="309000" />
+      <workItem from="1769891086837" duration="68000" />
+      <workItem from="1769939001409" duration="50000" />
+      <workItem from="1770026937997" duration="1223000" />
+      <workItem from="1770052429464" duration="612000" />
+      <workItem from="1770053069061" duration="448000" />
+      <workItem from="1770053568145" duration="383000" />
     </task>
     <task id="LOCAL-00001" summary="zaaaaaaaaaaaaaaaaaaaaaaadaaaaaaaaaaaaaannnnnnnnnnnnnnnnnn">
       <option name="closed" value="true" />
@@ -103,14 +188,64 @@
       <option name="project" value="LOCAL" />
       <updated>1769863771343</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="zaaaaaaaaaaaaaaaaaaaaaaadaaaaaaaaaaaaaannnnnnnnnnnnnnnnnn">
+      <option name="closed" value="true" />
+      <created>1769867284641</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1769867284641</updated>
+    </task>
+    <task id="LOCAL-00003" summary="bebin oomade">
+      <option name="closed" value="true" />
+      <created>1769869138335</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1769869138335</updated>
+    </task>
+    <task id="LOCAL-00004" summary="bebin oomade">
+      <option name="closed" value="true" />
+      <created>1769871453523</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1769871453523</updated>
+    </task>
+    <task id="LOCAL-00005" summary="kkkkkkkkk">
+      <option name="closed" value="true" />
+      <created>1769871566698</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1769871566698</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="VCPKGProject">
+    <isAutomaticCheckingOnLaunch value="false" />
+    <isAutomaticFoundErrors value="true" />
+    <isAutomaticReloadCMake value="true" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="zaaaaaaaaaaaaaaaaaaaaaaadaaaaaaaaaaaaaannnnnnnnnnnnnnnnnn" />
-    <option name="LAST_COMMIT_MESSAGE" value="zaaaaaaaaaaaaaaaaaaaaaaadaaaaaaaaaaaaaannnnnnnnnnnnnnnnnn" />
+    <MESSAGE value="bebin oomade" />
+    <MESSAGE value="kkkkkkkkk" />
+    <option name="LAST_COMMIT_MESSAGE" value="kkkkkkkkk" />
   </component>
 </project>
