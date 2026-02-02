@@ -10,6 +10,7 @@ namespace zaaaaaaaaaa {
 
 using namespace std;
 int main (){
-    cout<<"zaaaaaaadddddddddddaaaaaaaaaaaaaannnnnnnnnnnnnn";
+    cout<<"zaaaaaaadddddddddddaaaaaaaaaaaaaannnnnnnnnnnnnn"<<"\n";
+    cout<<"arn";
     return 0 ;
 }
