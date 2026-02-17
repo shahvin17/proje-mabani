@@ -23,19 +23,8 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="99c6744c-f731-4f41-8b58-f71169fab13e" name="Changes" comment="emtehan mikonim">
-      <change afterPath="$PROJECT_DIR$/.idea/.name" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/c_cpp_properties.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/logic.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/logic.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/CMakeLists.txt" afterDir="false" />
+    <list default="true" id="99c6744c-f731-4f41-8b58-f71169fab13e" name="Changes" comment="=`">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tamrin7test.cu" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tamrin7test.cuh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/testtttttttttt.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/testtttttttttt.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tttttttttttttttttt7.cpp" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -105,12 +94,12 @@
   ],
   &quot;lastFilter&quot;: {}
 }</component>
-  <component name="GithubPullRequestsUISettings">{
-  &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;https://github.com/shahvin17/proje-mabani.git&quot;,
-    &quot;accountId&quot;: &quot;ea41588c-bb63-4169-92ca-812a8a416757&quot;
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "git@github.com:shahvin17/proje-mabani.git",
+    "accountId": "ea41588c-bb63-4169-92ca-812a8a416757"
   }
-}</component>
+}]]></component>
   <component name="ProjectApplicationVersion">
     <option name="ide" value="CLion" />
     <option name="majorVersion" value="2025" />
@@ -131,6 +120,7 @@
     "CMake Debug.proje_mabani.executor": "Debug",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.cidr.known.project.marker": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
@@ -151,11 +141,6 @@
   }
 }]]></component>
   <component name="RunManager" selected="C/C++ File.kkakaka">
-    <configuration default="true" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
-      <method v="2">
-        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
-      </method>
-    </configuration>
     <configuration name="proje_mabani" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="proje_mabani" TARGET_NAME="proje_mabani" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="proje_mabani" RUN_TARGET_NAME="proje_mabani">
       <method v="2">
         <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
@@ -202,6 +187,7 @@
       <workItem from="1770899060320" duration="28000" />
       <workItem from="1770903560722" duration="328000" />
       <workItem from="1770903896764" duration="1363000" />
+      <workItem from="1771342028468" duration="12000" />
     </task>
     <task id="LOCAL-00001" summary="zaaaaaaaaaaaaaaaaaaaaaaadaaaaaaaaaaaaaannnnnnnnnnnnnnnnnn">
       <option name="closed" value="true" />
@@ -287,5 +273,16 @@
     <MESSAGE value="kkkkkkkkk" />
     <MESSAGE value="emtehan mikonim" />
     <option name="LAST_COMMIT_MESSAGE" value="emtehan mikonim" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/.idea/logic.h</url>
+          <line>15</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>
