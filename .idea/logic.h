@@ -4,6 +4,22 @@
 
 #ifndef PROJE_MABANI_LOGIC_H
 #define PROJE_MABANI_LOGIC_H
+#include <iostream>
+#include "math.h"
+
+using namespace std;
+double DEG_TO_RAD (double a ) {double c = (a* 3.14159) /( 180.0);
+    return c ;}
+typedef struct {
+    char name[50];
+    double x;
+    double y;
+    double direction;
+    int size;
+    bool isVisible;
+}
+        Sprite;
+void moveSteps(Sprite* spr, double steps) {
 
 
     spr->x += steps * sin(DEG_TO_RAD(spr->direction));
