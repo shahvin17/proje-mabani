@@ -1,19 +1,37 @@
 #include <iostream>
 #include "core_types.h"
 #include "runtime.h"
+#include "persist.h"
+
+using namespace std;
 
 int main() {
 
-    // 🔹 ساخت پروژه تست
+    cout << "=== Day 1 Runtime Test ===" << endl;
+
+    // ساخت پروژه تستی
     Project project;
 
-    Block b1 {1, BLOCK_MOVE, 2, -1, {0}};
-    Block b2 {2, BLOCK_TURN, -1, -1, {0}};
+    // بلاک اول
+    Block b1;
+    b1.id = 1;
+    b1.type = "move";
+    b1.nextBlockId = 2;
+    b1.x = 0;
+    b1.y = 0;
+
+    // بلاک دوم
+    Block b2;
+    b2.id = 2;
+    b2.type = "turn";
+    b2.nextBlockId = -1;
+    b2.x = 0;
+    b2.y = 0;
 
     project.blocks.push_back(b1);
     project.blocks.push_back(b2);
 
-    // 🔹 ساخت Runtime
+    // ساخت runtime
     Runtime rt;
     runtime_init(&rt, &project);
 
@@ -21,6 +39,15 @@ int main() {
 
     while (rt.state == RUNTIME_RUNNING) {
         runtime_executeCurrent(&rt);
+    }
+
+    cout << "=== Execution Finished ===" << endl;
+
+    // تست Save
+    if (saveProject(project, "test_project.txt")) {
+        cout << "Project saved successfully." << endl;
+    } else {
+        cout << "Save failed." << endl;
     }
 
     return 0;
