@@ -12,7 +12,7 @@ bool saveProject(const Project& project, const string& path) {
     for (const auto& s : project.sprites) {
         file << s.id << " " << s.name << " "
              << s.x << " " << s.y << " "
-             << s.direction << " " << s.visible <<endl;
+             << s.direction << " " << s.visible << endl;
     }
 
     file << project.blocks.size() << endl;
