@@ -87,4 +87,3 @@ bool saveProjectAndMark(Project& project, const string& path) {
     }
     return false;
 }
-
