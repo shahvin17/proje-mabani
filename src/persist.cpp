@@ -29,10 +29,7 @@ bool loadProject(Project& project, const string& path) {
 
     project.sprites.clear();
 
-    size_t count;
-    file >> count;
-
-    for (size_t i = 0; i < count; i++) {
+    for (size_t i = 0; i < spriteCount; i++) {
         Sprite s;
         file >> s.id >> s.name >> s.x >> s.y >> s.direction >> s.visible;
         project.sprites.push_back(s);
