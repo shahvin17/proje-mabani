@@ -70,7 +70,6 @@ bool loadProject(Project& project, const string& path) {
     if (!file.good()) return false;
 
     project.isModified = false;
-
     return true;
 }
 

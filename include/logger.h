@@ -8,7 +8,5 @@ using namespace std;
 void logInfo(const std::string& msg);
 void logWarning(const std::string& msg);
 void logError(const std::string& msg);
-logInfo("Project saved successfully.");
-logError("Failed to load file.");
 
 
