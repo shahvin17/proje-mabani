@@ -6,9 +6,7 @@ bool saveProject(const Project& project, const string& path) {
     if (!file.is_open())
         return false;
     file << "FOP1" << endl;
-
-    file << project.sprites.size() <<endl;
-
+    file << project.sprites.size() << endl;
     for (const auto& s : project.sprites) {
         file << s.id << " " << s.name << " "
              << s.x << " " << s.y << " "
