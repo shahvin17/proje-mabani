@@ -15,6 +15,17 @@ bool saveProject(const Project& project, const string& path) {
              << s.direction << " " << s.visible <<endl;
     }
 
+    file << project.blocks.size() << endl;
+    for (const auto& b : project.blocks) {
+        file << b.id << " " << b.type << " "
+             << b.x << " " << b.y << " "
+             << b.nextBlockId << " "
+             << b.inputs.size();
+
+        for (int inId : b.inputs) file << " " << inId;
+        file << endl;
+    }
+
     if (!file.good()) return false;
     return true;
 }
