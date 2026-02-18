@@ -49,6 +49,13 @@ int main() {
     } else {
         cout << "Save failed." << endl;
     }
+    Project loaded;
 
+    if (loadProject(loaded, "test_project.txt")) {
+        cout << "Load successful." << endl;
+        cout << "Loaded blocks count: " << loaded.blocks.size() << endl;
+    } else {
+        cout << "Load failed." << endl;
+    }
     return 0;
 }
