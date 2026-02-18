@@ -38,6 +38,29 @@ bool loadProject(Project& project, const string& path) {
         project.sprites.push_back(s);
     }
 
+    size_t blockCount;
+    file >> blockCount;
+
+    for (size_t i = 0; i < blockCount; i++) {
+        Block b;
+        size_t inputsCount;
+
+        file >> b.id >> b.type >> b.x >> b.y >> b.nextBlockId >> inputsCount;
+
+        b.inputs.clear();
+        b.inputs.reserve(inputsCount);
+
+        for (size_t k = 0; k < inputsCount; k++) {
+            int inId;
+            file >> inId;
+            b.inputs.push_back(inId);
+        }
+
+        project.blocks.push_back(b);
+    }
+
+    if (!file.good()) return false;
+
     project.isModified = false;
 
     return true;
