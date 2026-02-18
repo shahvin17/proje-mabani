@@ -81,3 +81,9 @@ void newProject(Project& project) {
 bool saveProjectAndMark(Project& project, const string& path) {
     if (saveProject(project, path)) {
         project.isModified = false;
+
+
+        return true;
+    }
+    return false;
+}
