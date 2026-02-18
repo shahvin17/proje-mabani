@@ -2,6 +2,7 @@
 #define RUNTIME_H
 
 #include "core_types.h"
+using namespace std;
 
 enum RuntimeState {
     RUNTIME_STOPPED,
