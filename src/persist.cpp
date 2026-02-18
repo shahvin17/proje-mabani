@@ -28,6 +28,9 @@ bool loadProject(Project& project, const string& path) {
     if (ver != "FOP1") return false;
 
     project.sprites.clear();
+    project.blocks.clear();
+    size_t spriteCount;
+    file >> spriteCount;
 
     for (size_t i = 0; i < spriteCount; i++) {
         Sprite s;
