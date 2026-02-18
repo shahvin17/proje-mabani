@@ -22,3 +22,4 @@ add_executable(proje_mabani
 )
 
 target_include_directories(proje_mabani PRIVATE include)
+
