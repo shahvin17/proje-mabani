@@ -15,10 +15,12 @@ bool VarStore::setVar(const std::string& name, const Value& v) {
     return true;
 }
 
-bool VarStore::changeVar(const std::string& name, double delta) {
-    auto it = vars.find(name);
-    if (it == vars.end()) return false;
-    if (it->second.type != Value::Type::Number) return false;
+bool var_change(VarStore& vs, const std::string& name, double delta) {
+    auto it = vs.vars.find(name);
+    if (it == vs.vars.end()) return false;
+
+    if (it->second.type != Value::NUMBER) return false; // فقط عدد
+
     it->second.num += delta;
     return true;
 }
