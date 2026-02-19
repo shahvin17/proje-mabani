@@ -8,9 +8,10 @@ bool VarStore::defineVar(const std::string& name, const Value& initial) {
     return true;
 }
 
-bool VarStore::setVar(const std::string& name, const Value& v) {
-    auto it = vars.find(name);
-    if (it == vars.end()) return false;
+bool var_set(VarStore& vs, const std::string& name, const Value& v) {
+    auto it = vs.vars.find(name);
+    if (it == vs.vars.end()) return false;
+
     it->second = v;
     return true;
 }
