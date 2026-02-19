@@ -8,7 +8,7 @@
 struct Value {
     enum Type { NUMBER, STRING };
 
-    Type type = Type::Number;
+    Type type = NUMBER;
     double num = 0.0;
     std::string str;
 
