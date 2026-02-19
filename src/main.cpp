@@ -2,7 +2,7 @@
 #include "core_types.h"
 #include "runtime.h"
 #include "persist.h"
-
+#include <vars_ops.h>
 using namespace std;
 
 int main() {
