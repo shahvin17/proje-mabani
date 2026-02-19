@@ -23,9 +23,9 @@ bool VarStore::changeVar(const std::string& name, double delta) {
     return true;
 }
 
-const Value* VarStore::getVar(const std::string& name) const {
-    auto it = vars.find(name);
-    if (it == vars.end()) return nullptr;
+const Value* var_get(const VarStore& vs, const std::string& name) {
+    auto it = vs.vars.find(name);
+    if (it == vs.vars.end()) return nullptr;
     return &it->second;
 }
 
