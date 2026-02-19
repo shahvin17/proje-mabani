@@ -3,12 +3,17 @@
 
 #include "core_types.h"
 #include "runtime.h"
-using namespace std;
 
-// repeat handler
+// توجه:
+// در نسخه فعلی پروژه، منطق اجرای repeat و if
+// داخل runtime.cpp پیاده‌سازی شده است.
+// این فایل فقط به عنوان abstraction باقی می‌ماند
+// تا در صورت refactor بعدی استفاده شود.
+
+// repeat block handler
 void control_repeat(Runtime* rt, Block* block);
 
-// if handler
+// if block handler
 void control_if(Runtime* rt, Block* block);
 
 #endif
