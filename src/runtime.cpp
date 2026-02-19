@@ -47,7 +47,12 @@ static void executePrimitive(Runtime* rt, Block* block) {
 }
 
 /* ===============================
-   Execute Chain (NEW Day 4)
+   Forward declare dispatcher
+================================ */
+static void executeBlock(Runtime* rt, Block* block);
+
+/* ===============================
+   Execute Chain (Day 4)
 ================================ */
 
 static void executeChain(Runtime* rt, int startBlockId) {
@@ -66,7 +71,8 @@ static void executeChain(Runtime* rt, int startBlockId) {
             return;
         }
 
-        executePrimitive(rt, block);
+        // ✅ FIX: chain باید dispatcher را صدا بزند (نه primitive)
+        executeBlock(rt, block);
 
         currentId = block->nextBlockId;
     }
@@ -130,13 +136,16 @@ static void executeIf(Runtime* rt, Block* block) {
 
 static void executeBlock(Runtime* rt, Block* block) {
 
-    cout << "Executing block id=" << block->id
-         << " type=" << block->type << endl;
-
+    // ✅ FIX: چاپ تکراری حذف شد (primitive خودش چاپ می‌کند)
+    // فقط برای controlها چاپ اضافه می‌گذاریم (اختیاری)
     if (block->type == "repeat") {
+        cout << "Executing block id=" << block->id
+             << " type=" << block->type << endl;
         executeRepeat(rt, block);
     }
     else if (block->type == "if") {
+        cout << "Executing block id=" << block->id
+             << " type=" << block->type << endl;
         executeIf(rt, block);
     }
     else {

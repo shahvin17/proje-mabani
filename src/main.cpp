@@ -61,6 +61,88 @@ int main() {
 }
 */
 
+/*#include <iostream>
+#include "core_types.h"
+#include "runtime.h"
+
+using namespace std;
+
+int main() {
+
+    cout << "=== Scratch Engine Day 4 Test ===" << endl;
+
+    Project project;
+
+    /*
+        Block layout:
+
+        1: move
+        2: repeat (2 times, child=3)
+        3: move (inside repeat)
+        4: if (true, child=5)
+        5: turn
+        6: turn (after repeat)
+
+        chain:
+        1 -> 2 -> 6
+        3 -> 4
+    
+
+    Block b1;
+    b1.id = 1;
+    b1.type = "move";
+    b1.nextBlockId = 2;
+
+    Block b2;
+    b2.id = 2;
+    b2.type = "repeat";
+    b2.inputs = {2, 3};   // repeat 2 times, child id=3
+    b2.nextBlockId = 6;
+
+    Block b3;
+    b3.id = 3;
+    b3.type = "move";
+    b3.nextBlockId = 4;
+
+    Block b4;
+    b4.id = 4;
+    b4.type = "if";
+    b4.inputs = {1, 5};   // condition true, child=5
+    b4.nextBlockId = -1;
+
+    Block b5;
+    b5.id = 5;
+    b5.type = "turn";
+    b5.nextBlockId = -1;
+
+    Block b6;
+    b6.id = 6;
+    b6.type = "turn";
+    b6.nextBlockId = -1;
+
+    project.blocks.push_back(b1);
+    project.blocks.push_back(b2);
+    project.blocks.push_back(b3);
+    project.blocks.push_back(b4);
+    project.blocks.push_back(b5);
+    project.blocks.push_back(b6);
+
+    Runtime rt;
+    runtime_init(&rt, &project);
+    runtime_start(&rt);
+
+    while (runtime_isRunning(&rt)) {
+        runtime_tick(&rt);
+    }
+
+    cout << "=== Execution Finished ===" << endl;
+
+    return 0;
+}
+*/
+
+
+
 #include <SDL.h>
 #include <iostream>
 #include "render.h"
