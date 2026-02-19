@@ -8,6 +8,7 @@ enum EventType {
     EVENT_ON_START = 0,
     EVENT_ON_KEY_PRESSED = 1,
     EVENT_ON_SPRITE_CLICKED = 2
+    EVENT_ON_MESSAGE = 3
 };
 
 struct EventKey {
