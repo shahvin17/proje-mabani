@@ -20,25 +20,12 @@ inline Value value_number(double x) {
     return v;
 }
 
-    static Value text(const std::string& s) {
-        Value v;
-        v.type = Type::String;
-        v.str = s;
-        return v;
-    }
-};
-
-
-class VarStore {
-public:
-
-    bool defineVar(const std::string& name, const Value& initial);
-
-
-    bool setVar(const std::string& name, const Value& v);
-
-
-    bool changeVar(const std::string& name, double delta);
+inline Value value_text(const std::string& s) {
+    Value v;
+    v.type = Value::STRING;
+    v.str = s;
+    return v;
+}
 
     const Value* getVar(const std::string& name) const;
 
