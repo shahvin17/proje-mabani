@@ -41,3 +41,6 @@ void drawWindow(const string Title, const unsigned int x1, y1, x2, y2){
     Sint16 Y2[4]={y1,y1,y1+20,y1+20};
     filledPolygonColor(m_renderer,X2,Y2,4,titleColor);
 }
+
+void drag(){
+}
