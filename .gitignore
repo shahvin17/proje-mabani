@@ -1,0 +1,12 @@
+# JetBrains
+.idea/
+
+# Build artifacts
+build/
+cmake-build-*/
+*.o
+*.obj
+*.exe
+*.a
+*.dll
+*.so
