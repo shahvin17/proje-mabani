@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/scratch_app.dir/src/main.cpp.o CMakeFiles/scratch_app.dir/src/runtime.cpp.o CMakeFiles/scratch_app.dir/src/persist.cpp.o -o scratch_app 

@@ -1,3 +1,0 @@
-/root/c++-projects/projects/proje-mabani/build/CMakeFiles/scratch_app.dir
-/root/c++-projects/projects/proje-mabani/build/CMakeFiles/edit_cache.dir
-/root/c++-projects/projects/proje-mabani/build/CMakeFiles/rebuild_cache.dir
