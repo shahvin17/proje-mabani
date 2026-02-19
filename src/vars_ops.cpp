@@ -5,7 +5,7 @@ bool var_define(VarStore& vs, const std::string& name, const Value& initial) {
     if (vars.find(name) != vars.end()) return false;
 
     if (vs.vars.find(name) != vs.vars.end())
-        return false; 
+        return false;
 
     vs.vars[name] = initial;
     return true;
