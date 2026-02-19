@@ -25,8 +25,7 @@ bool var_change(VarStore& vs, const std::string& name, double delta) {
 
     auto it = vs.vars.find(name);
     if (it == vs.vars.end()) return false;
-
-    if (it->second.type != Value::NUMBER) return false; // فقط عدد
+    if (it->second.type != Value::NUMBER) return false;
 
     it->second.num += delta;
     return true;
