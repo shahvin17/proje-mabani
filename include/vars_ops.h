@@ -4,47 +4,41 @@
 #include <string>
 #include <unordered_map>
 
-
 struct Value {
-    enum class Type { Number, String };
+    enum Type { NUMBER, STRING };
 
-    Type type = Type::Number;
+    Type type = NUMBER;
     double num = 0.0;
     std::string str;
-
-    static Value number(double x) {
-        Value v;
-        v.type = Type::Number;
-        v.num = x;
-        return v;
-    }
-
-    static Value text(const std::string& s) {
-        Value v;
-        v.type = Type::String;
-        v.str = s;
-        return v;
-    }
 };
 
+inline Value value_number(double x) {
+    Value v;
+    v.type = Value::NUMBER;
+    v.num = x;
+    return v;
+}
 
-class VarStore {
-public:
+inline Value value_text(const std::string& s) {
+    Value v;
+    v.type = Value::STRING;
+    v.str = s;
+    return v;
+}
 
-    bool defineVar(const std::string& name, const Value& initial);
-
-
-    bool setVar(const std::string& name, const Value& v);
-
-
-    bool changeVar(const std::string& name, double delta);
-
-    const Value* getVar(const std::string& name) const;
-
-    const std::unordered_map<std::string, Value>& all() const;
-
-private:
+struct VarStore {
     std::unordered_map<std::string, Value> vars;
 };
+
+bool var_define(VarStore& vs, const std::string& name, const Value& initial);
+
+bool var_set(VarStore& vs, const std::string& name, const Value& v);
+
+bool var_change(VarStore& vs, const std::string& name, double delta);
+
+
+const Value* var_get(const VarStore& vs, const std::string& name);
+
+const std::unordered_map<std::string, Value>& var_all(const VarStore& vs);
 
 #endif

@@ -9,6 +9,7 @@ add_executable(scratch_app
     src/runtime.cpp
     src/persist.cpp
         src/vars_ops.cpp
+        src/events.cpp
 
 )
 

@@ -37,8 +37,8 @@ int main() {
 
     runtime_start(&rt);
 
-    while (rt.state == RUNTIME_RUNNING) {
-        runtime_executeCurrent(&rt);
+    while (runtime_isRunning(&rt)) {
+        runtime_tick(&rt);
     }
 
     cout << "=== Execution Finished ===" << endl;
