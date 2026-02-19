@@ -11,6 +11,7 @@ struct Value {
     Type type = NUMBER;
     double num = 0.0;
     std::string str;
+};
 
     static Value number(double x) {
         Value v;
