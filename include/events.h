@@ -32,5 +32,6 @@ struct EventManager {
 void event_clear(EventManager& em);
 void event_bind(EventManager& em, EventType type, int code, int startBlockId);
 const std::vector<int>* event_get(const EventManager& em, EventType type, int code);
-
+void event_bind_message(EventManager& em, const std::string& message, int startBlockId);
+const std::vector<int>* event_get_message(const EventManager& em, const std::string& message);
 #endif
