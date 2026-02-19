@@ -4,7 +4,10 @@ bool VarStore::defineVar(const std::string& name, const Value& initial) {
     if (name.empty()) return false;
     if (vars.find(name) != vars.end()) return false;
 
-    vars[name] = initial;
+    if (vs.vars.find(name) != vs.vars.end())
+        return false; // جلوگیری از تکراری بودن (53)
+
+    vs.vars[name] = initial; // تعریف (52)
     return true;
 }
 
