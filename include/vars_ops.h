@@ -33,4 +33,16 @@ struct VarStore {
     std::unordered_map<std::string, Value> vars;
 };
 
+
+bool var_define(VarStore& vs, const std::string& name, const Value& initial);
+
+bool var_set(VarStore& vs, const std::string& name, const Value& v);
+
+bool var_change(VarStore& vs, const std::string& name, double delta);
+
+
+const Value* var_get(const VarStore& vs, const std::string& name);
+
+const std::unordered_map<std::string, Value>& var_all(const VarStore& vs);
+
 #endif
