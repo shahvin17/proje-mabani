@@ -4,7 +4,6 @@
 #include <string>
 #include <unordered_map>
 
-
 struct Value {
     enum Type { NUMBER, STRING };
 
