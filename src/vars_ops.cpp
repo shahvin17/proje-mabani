@@ -29,6 +29,6 @@ const Value* VarStore::getVar(const std::string& name) const {
     return &it->second;
 }
 
-const std::unordered_map<std::string, Value>& VarStore::all() const {
-    return vars;
+const std::unordered_map<std::string, Value>& var_all(const VarStore& vs) {
+    return vs.vars;
 }
