@@ -47,9 +47,8 @@ Value op_sub(const Value& a, const Value& b, bool& out_error);
 Value op_mul(const Value& a, const Value& b, bool& out_error);
 Value op_div(const Value& a, const Value& b, bool& out_error);
 
-
-Value op_greater_than(const Value& a, const Value& b);
-Value op_less_than(const Value& a, const Value& b);
+Value op_greater_than(const Value& a, const Value& b, bool& out_error);
+Value op_less_than(const Value& a, const Value& b, bool& out_error);
 Value op_equals(const Value& a, const Value& b);
 
 Value op_and(const Value& a, const Value& b);
