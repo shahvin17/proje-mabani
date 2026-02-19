@@ -1,4 +1,7 @@
 #include "vars_ops.h"
+#include <cmath>
+#include <iostream>
+#include <cmath>
 
 using namespace std;
 bool var_define(VarStore& vs, const std::string& name, const Value& initial) {
