@@ -115,3 +115,80 @@ Value op_string_letter_at(const Value& str, const Value& index, bool& out_error)
     }
     return value_text(std::string(1, str.str[idx]));
 }
+
+Value op_greater_than(const Value& a, const Value& b, bool& out_error) {
+    out_error = false;
+    if (!check_is_number(a, "GT", out_error) || !check_is_number(b, "GT", out_error))
+        return value_number(0.0);
+    return value_number(a.num > b.num ? 1.0 : 0.0);
+}
+
+Value op_less_than(const Value& a, const Value& b, bool& out_error) {
+    out_error = false;
+    if (!check_is_number(a, "LT", out_error) || !check_is_number(b, "LT", out_error))
+        return value_number(0.0);
+    return value_number(a.num < b.num ? 1.0 : 0.0);
+}
+
+
+Value op_equals(const Value& a, const Value& b) {
+    if (a.type == Value::STRING && b.type == Value::STRING) return value_number((a.str == b.str) ? 1.0 : 0.0);
+    if (a.type == Value::NUMBER && b.type == Value::NUMBER) return value_number((a.num == b.num) ? 1.0 : 0.0);
+    return value_number(0.0);
+}
+
+static bool is_true(const Value& v) {
+    if (v.type == Value::STRING) return !v.str.empty();
+    return v.num != 0.0;
+}
+
+Value op_and(const Value& a, const Value& b) { return value_number((is_true(a) && is_true(b)) ? 1.0 : 0.0); }
+Value op_or(const Value& a, const Value& b) { return value_number((is_true(a) || is_true(b)) ? 1.0 : 0.0); }
+Value op_not(const Value& a) { return value_number(!is_true(a) ? 1.0 : 0.0); }
+
+Value op_string_length(const Value& str, bool& out_error) {
+    out_error = false;
+    if (str.type != Value::STRING) {
+        cerr << "[String Error] LENGTH expects STRING." << endl;
+        out_error = true;
+        return value_number(0.0);
+    }
+    return value_number((double)str.str.size());
+}
+
+Value op_string_join(const Value& str1, const Value& str2, bool& out_error) {
+    out_error = false;
+    if (str1.type != Value::STRING || str2.type != Value::STRING) {
+        cerr << "[String Error] JOIN expects STRING + STRING." << endl;
+        out_error = true;
+        return value_text("");
+    }
+    return value_text(str1.str + str2.str);
+}
+
+Value op_abs(const Value& a) { return (a.type == Value::NUMBER) ? value_number(std::abs(a.num)) : value_number(0.0); }
+Value op_floor(const Value& a) { return (a.type == Value::NUMBER) ? value_number(std::floor(a.num)) : value_number(0.0); }
+Value op_ceil(const Value& a) { return (a.type == Value::NUMBER) ? value_number(std::ceil(a.num)) : value_number(0.0); }
+
+
+static double deg_to_rad(double deg) { return (deg * 3.14159265) / 180.0; }
+
+Value op_sin(const Value& a) { return (a.type == Value::NUMBER) ? value_number(std::sin(deg_to_rad(a.num))) : value_number(0.0); }
+Value op_cos(const Value& a) { return (a.type == Value::NUMBER) ? value_number(std::cos(deg_to_rad(a.num))) : value_number(0.0); }
+
+Value op_modulo(const Value& a, const Value& b, bool& out_error) {
+    out_error = false;
+    if (!check_is_number(a, "MOD", out_error) || !check_is_number(b, "MOD", out_error)) return value_number(0.0);
+    if (b.num == 0.0) {
+        cerr << "[Math Error] Modulo by zero!" << endl;
+        out_error = true;
+        return value_number(0.0);
+    }
+    return value_number(std::fmod(a.num, b.num));
+}
+
+Value op_xor(const Value& a, const Value& b) {
+    bool valA = is_true(a);
+    bool valB = is_true(b);
+    return value_number((valA != valB) ? 1.0 : 0.0);
+}
