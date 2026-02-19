@@ -42,9 +42,9 @@ const Value* var_get(const VarStore& vs, const std::string& name);
 const std::unordered_map<std::string, Value>& var_all(const VarStore& vs);
 
 
-Value op_add(const Value& a, const Value& b);
-Value op_sub(const Value& a, const Value& b);
-Value op_mul(const Value& a, const Value& b);
+Value op_add(const Value& a, const Value& b, bool& out_error);
+Value op_sub(const Value& a, const Value& b, bool& out_error);
+Value op_mul(const Value& a, const Value& b, bool& out_error);
 Value op_div(const Value& a, const Value& b, bool& out_error);
 
 
