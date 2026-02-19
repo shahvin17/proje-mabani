@@ -13,12 +13,12 @@ struct Value {
     std::string str;
 };
 
-    static Value number(double x) {
-        Value v;
-        v.type = Type::Number;
-        v.num = x;
-        return v;
-    }
+inline Value value_number(double x) {
+    Value v;
+    v.type = Value::NUMBER;
+    v.num = x;
+    return v;
+}
 
     static Value text(const std::string& s) {
         Value v;
