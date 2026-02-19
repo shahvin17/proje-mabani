@@ -11,6 +11,8 @@ bool var_define(VarStore& vs, const std::string& name, const Value& initial) {
 }
 
 bool var_set(VarStore& vs, const std::string& name, const Value& v) {
+    if (name.empty()) return false;
+
     auto it = vs.vars.find(name);
     if (it == vs.vars.end()) return false;
 
@@ -19,6 +21,8 @@ bool var_set(VarStore& vs, const std::string& name, const Value& v) {
 }
 
 bool var_change(VarStore& vs, const std::string& name, double delta) {
+    if (name.empty()) return false;
+
     auto it = vs.vars.find(name);
     if (it == vs.vars.end()) return false;
 
@@ -29,6 +33,8 @@ bool var_change(VarStore& vs, const std::string& name, double delta) {
 }
 
 const Value* var_get(const VarStore& vs, const std::string& name) {
+    if (name.empty()) return nullptr;
+    
     auto it = vs.vars.find(name);
     if (it == vs.vars.end()) return nullptr;
     return &it->second;
