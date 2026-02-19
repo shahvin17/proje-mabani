@@ -55,8 +55,8 @@ Value op_equals(const Value& a, const Value& b);
 Value op_and(const Value& a, const Value& b);
 Value op_or(const Value& a, const Value& b);
 Value op_not(const Value& a);
-Value op_string_length(const Value& str);
-Value op_string_join(const Value& str1, const Value& str2);
+Value op_string_length(const Value& str, bool& out_error);
+Value op_string_join(const Value& str1, const Value& str2, bool& out_error);ص
 Value op_string_letter_at(const Value& str, const Value& index, bool& out_error);
 
 
