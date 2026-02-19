@@ -8,6 +8,8 @@ add_executable(scratch_app
     src/main.cpp
     src/runtime.cpp
     src/persist.cpp
+        src/vars_ops.cpp
+
 )
 
 target_include_directories(scratch_app PRIVATE include)
