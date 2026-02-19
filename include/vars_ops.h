@@ -29,9 +29,7 @@ inline Value value_text(const std::string& s) {
 
     const Value* getVar(const std::string& name) const;
 
-    const std::unordered_map<std::string, Value>& all() const;
-
-private:
+struct VarStore {
     std::unordered_map<std::string, Value> vars;
 };
 
