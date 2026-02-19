@@ -1,6 +1,6 @@
 #include "vars_ops.h"
 
-bool VarStore::defineVar(const std::string& name, const Value& initial) {
+bool var_define(VarStore& vs, const std::string& name, const Value& initial) {
     if (name.empty()) return false;
     if (vars.find(name) != vars.end()) return false;
 
