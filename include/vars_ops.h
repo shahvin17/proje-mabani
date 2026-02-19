@@ -26,8 +26,6 @@ inline Value value_text(const std::string& s) {
     return v;
 }
 
-    const Value* getVar(const std::string& name) const;
-
 struct VarStore {
     std::unordered_map<std::string, Value> vars;
 };
