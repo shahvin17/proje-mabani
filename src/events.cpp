@@ -1,5 +1,5 @@
 #include "events.h"
-
+#include <functional>
 void event_clear(EventManager& em) {
     em.table.clear();
 }
