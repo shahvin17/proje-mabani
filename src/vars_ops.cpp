@@ -1,5 +1,6 @@
 #include "vars_ops.h"
 
+using namespace std;
 bool var_define(VarStore& vs, const std::string& name, const Value& initial) {
     if (name.empty()) return false;
 
