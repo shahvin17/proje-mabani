@@ -6,7 +6,7 @@
 
 
 struct Value {
-    enum class Type { Number, String };
+    enum Type { NUMBER, STRING };
 
     Type type = Type::Number;
     double num = 0.0;
