@@ -3,7 +3,7 @@
 
 #include <unordered_map>
 #include <vector>
-
+#include <string>
 enum EventType {
     EVENT_ON_START = 0,
     EVENT_ON_KEY_PRESSED = 1,
