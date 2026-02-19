@@ -2,6 +2,7 @@
 #define RUNTIME_H
 
 #include "core_types.h"
+#include <string>
 using namespace std;
 
 enum RuntimeState {
@@ -14,13 +15,29 @@ struct Runtime {
     Project* project;
     int currentBlockId;
     RuntimeState state;
+
     int watchdogCounter;
     int watchdogLimit;
+
+    // برای گزارش/دیباگ
+    int lastExecutedBlockId;
 };
 
+// init / lifecycle
 void runtime_init(Runtime* rt, Project* project);
 void runtime_start(Runtime* rt);
 void runtime_stop(Runtime* rt);
-void runtime_executeCurrent(Runtime* rt);
+
+// pause/resume
+void runtime_pause(Runtime* rt);
+void runtime_resume(Runtime* rt);
+
+// tick-based execution (روز 2)
+void runtime_tick(Runtime* rt);
+
+// helpers
+bool runtime_isRunning(const Runtime* rt);
+bool runtime_isPaused(const Runtime* rt);
+void runtime_setWatchdogLimit(Runtime* rt, int limit);
 
 #endif
