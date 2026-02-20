@@ -49,8 +49,8 @@ target_include_directories(scratch_app PRIVATE
 
 # --- لینک کردن کتابخانه‌ها ---
 target_link_libraries(scratch_app
-    ${SDL2_LIBRARIES}        # کتابخانه SDL2 که به صورت خودکار پیدا شده
-    # ${SDL2_IMAGE_LIBRARIES}  # برای افزونه‌ها
+    ${SDL2_LIBRARIES}
+    # ${SDL2_IMAGE_LIBRARIES}
     # ${SDL2_TTF_LIBRARIES}
     # ${SDL2_MIXER_LIBRARIES}
 )
