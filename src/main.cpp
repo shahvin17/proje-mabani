@@ -3,11 +3,7 @@
 #include <vector>
 #include <map>
 #include <string>
-
-#include "core_types.h"
-#include "render.h"
-#include "runtime.h"
-
+// کصخل هدر هاشو تغییر بده
 // ... (بخش رنگ‌ها و توابع کمکی بدون تغییر) ...
 std::map<std::string, SDL_Color> block_colors = {
     {"when_start", {255, 170, 0, 255}},
