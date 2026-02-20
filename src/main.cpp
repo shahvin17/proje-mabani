@@ -178,7 +178,13 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return 1;
     }
-
+    DragRect rect;
+    rect.x = 200;
+    rect.y = 150;
+    rect.w = 200;
+    rect.h = 120;
+    rect.dragging = false
+    
     bool running = true;
     SDL_Event event;
 
