@@ -47,7 +47,6 @@ target_include_directories(scratch_app PRIVATE
     # ${SDL2_MIXER_INCLUDE_DIRS}
 )
 
-# --- لینک کردن کتابخانه‌ها ---
 target_link_libraries(scratch_app
     ${SDL2_LIBRARIES}
     # ${SDL2_IMAGE_LIBRARIES}
