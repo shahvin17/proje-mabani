@@ -61,18 +61,106 @@ int main() {
 }
 */
 
+/*#include <iostream>
+#include "core_types.h"
+#include "runtime.h"
+
+using namespace std;
+
+int main() {
+
+    cout << "=== Scratch Engine Day 4 Test ===" << endl;
+
+    Project project;
+
+    /*
+        Block layout:
+
+        1: move
+        2: repeat (2 times, child=3)
+        3: move (inside repeat)
+        4: if (true, child=5)
+        5: turn
+        6: turn (after repeat)
+
+        chain:
+        1 -> 2 -> 6
+        3 -> 4
+    
+
+    Block b1;
+    b1.id = 1;
+    b1.type = "move";
+    b1.nextBlockId = 2;
+
+    Block b2;
+    b2.id = 2;
+    b2.type = "repeat";
+    b2.inputs = {2, 3};   // repeat 2 times, child id=3
+    b2.nextBlockId = 6;
+
+    Block b3;
+    b3.id = 3;
+    b3.type = "move";
+    b3.nextBlockId = 4;
+
+    Block b4;
+    b4.id = 4;
+    b4.type = "if";
+    b4.inputs = {1, 5};   // condition true, child=5
+    b4.nextBlockId = -1;
+
+    Block b5;
+    b5.id = 5;
+    b5.type = "turn";
+    b5.nextBlockId = -1;
+
+    Block b6;
+    b6.id = 6;
+    b6.type = "turn";
+    b6.nextBlockId = -1;
+
+    project.blocks.push_back(b1);
+    project.blocks.push_back(b2);
+    project.blocks.push_back(b3);
+    project.blocks.push_back(b4);
+    project.blocks.push_back(b5);
+    project.blocks.push_back(b6);
+
+    Runtime rt;
+    runtime_init(&rt, &project);
+    runtime_start(&rt);
+
+    while (runtime_isRunning(&rt)) {
+        runtime_tick(&rt);
+    }
+
+    cout << "=== Execution Finished ===" << endl;
+
+    return 0;
+}
+*/
+
+
+
 #include <SDL.h>
 #include <iostream>
 #include "render.h"
 
 int main(int argc, char* argv[]) {
+
+    std::cout << "=== SDL Test Starting ===" << std::endl;
+
+    // =========================
+    // SDL INIT
+    // =========================
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        std::cerr << "SDL init failed\n";
+        std::cerr << "SDL init failed: " << SDL_GetError() << std::endl;
         return 1;
     }
 
     SDL_Window* window = SDL_CreateWindow(
-        "Scratch - Day 1 (A)",
+        "Scratch - SDL Day1 Test",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         800,
@@ -81,43 +169,62 @@ int main(int argc, char* argv[]) {
     );
 
     if (!window) {
-        std::cerr << "Window creation failed\n";
+        std::cerr << "Window creation failed: " << SDL_GetError() << std::endl;
         SDL_Quit();
         return 1;
     }
 
-    SDL_Renderer* renderer = SDL_CreateRenderer(
-        window, -1, SDL_RENDERER_ACCELERATED
-    );
+    SDL_Renderer* renderer =
+        SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     if (!renderer) {
-        std::cerr << "Renderer creation failed\n";
+        std::cerr << "Renderer creation failed: " << SDL_GetError() << std::endl;
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
     }
 
+    std::cout << "SDL successfully initialized!" << std::endl;
+
+    // =========================
+    // Create Test Rectangle
+    // =========================
+    DragRect rect{ 200, 150, 200, 120, false };
+
     bool running = true;
     SDL_Event event;
 
+    // =========================
+    // Main Loop
+    // =========================
     while (running) {
+
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
             }
         }
 
+        // Background color
         SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
         SDL_RenderClear(renderer);
 
-        renderTestRect(renderer);
+        // Draw rectangle
+        renderRect(renderer, rect);
 
         SDL_RenderPresent(renderer);
-        SDL_Delay(16);
+
+        SDL_Delay(16); // ~60 FPS
     }
 
+    // =========================
+    // Cleanup
+    // =========================
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+
+    std::cout << "=== SDL Test Finished ===" << std::endl;
+
     return 0;
 }

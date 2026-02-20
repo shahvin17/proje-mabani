@@ -18,4 +18,3 @@ target_include_directories(scratch_app PRIVATE include)
 # SDL2
 find_package(SDL2 REQUIRED)
 target_link_libraries(scratch_app SDL2::SDL2 SDL2::SDL2main)
-target_link_libraries(scratch_app-lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer)

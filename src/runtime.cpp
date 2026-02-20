@@ -24,11 +24,63 @@ static int getFirstBlockId(Project* project) {
 }
 
 /* ===============================
-   Control Blocks
+   Execute Single Block (Primitive)
 ================================ */
 
-// repeat: inputs[0] = count
-//         inputs[1] = child block id
+static void executePrimitive(Runtime* rt, Block* block) {
+
+    cout << "Executing block id=" << block->id
+         << " type=" << block->type << endl;
+
+    if (block->type == "move") {
+        cout << "  -> Move block" << endl;
+    }
+    else if (block->type == "turn") {
+        cout << "  -> Turn block" << endl;
+    }
+    else {
+        cout << "  -> Unknown block type: "
+             << block->type << endl;
+    }
+
+    rt->lastExecutedBlockId = block->id;
+}
+
+/* ===============================
+   Forward declare dispatcher
+================================ */
+static void executeBlock(Runtime* rt, Block* block);
+
+/* ===============================
+   Execute Chain (Day 4)
+================================ */
+
+static void executeChain(Runtime* rt, int startBlockId) {
+
+    int currentId = startBlockId;
+
+    while (currentId != -1) {
+
+        Block* block = findBlockById(rt->project, currentId);
+        if (!block) return;
+
+        rt->watchdogCounter++;
+        if (rt->watchdogCounter > rt->watchdogLimit) {
+            cout << "Watchdog limit reached inside chain." << endl;
+            runtime_stop(rt);
+            return;
+        }
+
+        // ✅ FIX: chain باید dispatcher را صدا بزند (نه primitive)
+        executeBlock(rt, block);
+
+        currentId = block->nextBlockId;
+    }
+}
+
+/* ===============================
+   Control Blocks
+================================ */
 
 static void executeRepeat(Runtime* rt, Block* block) {
 
@@ -46,12 +98,6 @@ static void executeRepeat(Runtime* rt, Block* block) {
 
     for (int i = 0; i < count; i++) {
 
-        Block* child = findBlockById(rt->project, childId);
-        if (!child) {
-            cout << "Repeat child not found." << endl;
-            return;
-        }
-
         rt->watchdogCounter++;
         if (rt->watchdogCounter > rt->watchdogLimit) {
             cout << "Watchdog limit reached inside repeat." << endl;
@@ -59,15 +105,11 @@ static void executeRepeat(Runtime* rt, Block* block) {
             return;
         }
 
-        cout << "  Repeat iteration " << i+1
-             << " executing block id=" << child->id << endl;
+        cout << "  Repeat iteration " << i+1 << endl;
 
-        // فعلاً فقط print (اتصال به motion روز بعد)
+        executeChain(rt, childId);
     }
 }
-
-// if: inputs[0] = condition (0 or 1)
-//     inputs[1] = child block id
 
 static void executeIf(Runtime* rt, Block* block) {
 
@@ -81,42 +123,33 @@ static void executeIf(Runtime* rt, Block* block) {
 
     if (condition) {
         cout << "If condition TRUE" << endl;
-
-        Block* child = findBlockById(rt->project, childId);
-        if (child) {
-            cout << "  Executing IF child id=" << child->id << endl;
-        } else {
-            cout << "IF child not found." << endl;
-        }
-
-    } else {
+        executeChain(rt, childId);
+    }
+    else {
         cout << "If condition FALSE" << endl;
     }
 }
 
 /* ===============================
-   Core Execute Dispatcher
+   Dispatcher
 ================================ */
 
 static void executeBlock(Runtime* rt, Block* block) {
 
-    cout << "Executing block id=" << block->id
-         << " type=" << block->type << endl;
-
-    if (block->type == "move") {
-        cout << "  -> Move block" << endl;
-    }
-    else if (block->type == "turn") {
-        cout << "  -> Turn block" << endl;
-    }
-    else if (block->type == "repeat") {
+    // ✅ FIX: چاپ تکراری حذف شد (primitive خودش چاپ می‌کند)
+    // فقط برای controlها چاپ اضافه می‌گذاریم (اختیاری)
+    if (block->type == "repeat") {
+        cout << "Executing block id=" << block->id
+             << " type=" << block->type << endl;
         executeRepeat(rt, block);
     }
     else if (block->type == "if") {
+        cout << "Executing block id=" << block->id
+             << " type=" << block->type << endl;
         executeIf(rt, block);
     }
     else {
-        cout << "  -> Unknown block type: " << block->type << endl;
+        executePrimitive(rt, block);
     }
 
     rt->lastExecutedBlockId = block->id;
@@ -190,7 +223,7 @@ void runtime_resume(Runtime* rt) {
 }
 
 /* ===============================
-   Tick Engine (Step Execution)
+   Tick Engine
 ================================ */
 
 void runtime_tick(Runtime* rt) {

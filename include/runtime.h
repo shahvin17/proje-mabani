@@ -3,6 +3,7 @@
 
 #include "core_types.h"
 #include <string>
+#include <vector>
 using namespace std;
 
 enum RuntimeState {
@@ -21,6 +22,11 @@ struct Runtime {
 
     // برای گزارش/دیباگ
     int lastExecutedBlockId;
+
+    //day4
+    std::vector<int> returnStack;   // برگشت بعد از child
+    std::vector<int> loopCounter;   // شمارنده repeat
+
 };
 
 // init / lifecycle
