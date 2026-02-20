@@ -40,9 +40,9 @@ endif()
 
 # --- تنظیم مسیرهای Header ---
 target_include_directories(scratch_app PRIVATE
-    include                  # مسیر هدرهای پروژه شما
-    ${SDL2_INCLUDE_DIRS}     # مسیر هدرهای SDL2 که به صورت خودکار پیدا شده
-    # ${SDL2_IMAGE_INCLUDE_DIRS} # برای افزونه‌ها
+    include
+    ${SDL2_INCLUDE_DIRS}
+    # ${SDL2_IMAGE_INCLUDE_DIRS}
     # ${SDL2_TTF_INCLUDE_DIRS}
     # ${SDL2_MIXER_INCLUDE_DIRS}
 )
