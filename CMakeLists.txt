@@ -34,7 +34,6 @@ else()
     add_executable(scratch_app ${APP_SOURCES})
 endif()
 
-# --- تنظیم مسیرهای Header ---
 target_include_directories(scratch_app PRIVATE
     include
     ${SDL2_INCLUDE_DIRS}
