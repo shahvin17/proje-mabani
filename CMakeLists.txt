@@ -10,8 +10,6 @@ find_package(SDL2 REQUIRED)
 # find_package(SDL2_ttf REQUIRED)
 # find_package(SDL2_mixer REQUIRED)
 
-# --- تعریف فایل‌های سورس پروژه ---
-# استفاده از یک متغیر برای تمیز نگه داشتن کد
 set(APP_SOURCES
     src/main.cpp
     src/runtime.cpp
