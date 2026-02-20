@@ -143,7 +143,7 @@ int main() {
 
 
 
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <iostream>
 #include "render.h"
 

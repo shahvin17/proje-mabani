@@ -19,6 +19,9 @@ struct Sprite {
     float x, y;
     float direction;
     bool visible;
+    float width = 50.0f;
+    float height = 50.0f;
+    bool draggable = false;
 };
 
 struct Project {
