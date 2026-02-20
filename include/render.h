@@ -1,6 +1,6 @@
 #ifndef RENDER_H
 #define RENDER_H
-#include <SDL.h>
+#include <SDL2/SDL.h>
 
 struct DragRect {
     int x, y;
