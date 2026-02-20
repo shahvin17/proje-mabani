@@ -5,12 +5,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(scratch_app
-    src/main.cpp
-    src/runtime.cpp
-    src/persist.cpp
-    src/vars_ops.cpp
-    src/events.cpp
-    src/control.cpp
+        src/main.cpp
+        src/runtime.cpp
+        src/persist.cpp
+        src/render.cpp
+        src/control.cpp
+        src/vars_ops.cpp
+        src/events.cpp
 )
 target_link_libraries(scratch_app  -lconio)
 
