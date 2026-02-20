@@ -37,7 +37,7 @@ bool var_change(VarStore& vs, const std::string& name, double delta) {
 
 const Value* var_get(const VarStore& vs, const std::string& name) {
     if (name.empty()) return nullptr;
-    
+
     auto it = vs.vars.find(name);
     if (it == vs.vars.end()) return nullptr;
     return &it->second;
