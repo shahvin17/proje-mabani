@@ -1,3 +1,4 @@
+#include "render.h"
 
 longint const titleColor= 0xFF40C040, windowColor= 0xFF103010;
 unsigned int screenWidth, screenHeight;
@@ -44,8 +45,6 @@ void drawWindow(const string Title, const unsigned int x1, y1, x2, y2){
 
 void drag(){
 }
-
-#include "render.h"
 
 void renderRect(SDL_Renderer* renderer, const DragRect& r) {
     SDL_Rect rect{r.x, r.y, r.w, r.h};
