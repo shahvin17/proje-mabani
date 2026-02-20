@@ -3,10 +3,6 @@ project(ScratchProject)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# --- یافتن وابستگی‌ها (Dependencies) ---
-# این روش مدرن و کراس-پلتفرم برای پیدا کردن SDL2 است.
-# CMake به طور خودکار در مسیرهای استاندارد سیستم به دنبال آن می‌گردد.
 find_package(SDL2 REQUIRED)
 
 # اگر از افزونه‌های دیگر SDL2 استفاده می‌کنید، آنها را نیز اضافه کنید (از کامنت خارج کنید)
