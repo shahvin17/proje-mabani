@@ -24,9 +24,8 @@ set(APP_SOURCES
     src/control.cpp
     src/vars_ops.cpp
     src/events.cpp
-    # هر فایل cpp جدیدی که ساختید، اینجا اضافه کنید
-    # src/looks.cpp
-    # src/pen.cpp
+     src/looks.cpp
+    src/pen.cpp
 )
 
 # --- تعریف فایل اجرایی ---
