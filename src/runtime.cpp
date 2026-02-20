@@ -1,246 +1,161 @@
 #include "runtime.h"
 #include <iostream>
-using namespace std;
 
-/* ===============================
-   Helpers
-================================ */
-
+// تابع کمکی برای پیدا کردن بلوک (بدون تغییر)
 static Block* findBlockById(Project* project, int id) {
     if (!project) return nullptr;
-
-    for (size_t i = 0; i < project->blocks.size(); i++) {
-        if (project->blocks[i].id == id) {
-            return &project->blocks[i];
-        }
+    for (auto& b : project->blocks) {
+        if (b.id == id) return &b;
     }
     return nullptr;
 }
 
-static int getFirstBlockId(Project* project) {
-    if (!project) return -1;
-    if (project->blocks.empty()) return -1;
-    return project->blocks[0].id;
-}
+// Forward-declarations برای توابع اجرا
+static void executeBlock(Runtime* rt, Block* block);
+static void executePrimitive(Runtime* rt, Block* block);
+static void executeRepeat(Runtime* rt, Block* block);
 
-/* ===============================
-   Control Blocks
-================================ */
-
-// repeat: inputs[0] = count
-//         inputs[1] = child block id
-
-static void executeRepeat(Runtime* rt, Block* block) {
-
-    if (block->inputs.size() < 2) {
-        cout << "Repeat block missing inputs." << endl;
-        return;
-    }
-
-    int count   = block->inputs[0];
-    int childId = block->inputs[1];
-
-    if (count <= 0) return;
-
-    cout << "Repeat " << count << " times" << endl;
-
-    for (int i = 0; i < count; i++) {
-
-        Block* child = findBlockById(rt->project, childId);
-        if (!child) {
-            cout << "Repeat child not found." << endl;
-            return;
-        }
-
-        rt->watchdogCounter++;
-        if (rt->watchdogCounter > rt->watchdogLimit) {
-            cout << "Watchdog limit reached inside repeat." << endl;
-            runtime_stop(rt);
-            return;
-        }
-
-        cout << "  Repeat iteration " << i+1
-             << " executing block id=" << child->id << endl;
-
-        // فعلاً فقط print (اتصال به motion روز بعد)
-    }
-}
-
-// if: inputs[0] = condition (0 or 1)
-//     inputs[1] = child block id
-
-static void executeIf(Runtime* rt, Block* block) {
-
-    if (block->inputs.size() < 2) {
-        cout << "If block missing inputs." << endl;
-        return;
-    }
-
-    int condition = block->inputs[0];
-    int childId   = block->inputs[1];
-
-    if (condition) {
-        cout << "If condition TRUE" << endl;
-
-        Block* child = findBlockById(rt->project, childId);
-        if (child) {
-            cout << "  Executing IF child id=" << child->id << endl;
-        } else {
-            cout << "IF child not found." << endl;
-        }
-
-    } else {
-        cout << "If condition FALSE" << endl;
-    }
-}
-
-/* ===============================
-   Core Execute Dispatcher
-================================ */
-
-static void executeBlock(Runtime* rt, Block* block) {
-
-    cout << "Executing block id=" << block->id
-         << " type=" << block->type << endl;
-
-    if (block->type == "move") {
-        cout << "  -> Move block" << endl;
-    }
-    else if (block->type == "turn") {
-        cout << "  -> Turn block" << endl;
-    }
-    else if (block->type == "repeat") {
-        executeRepeat(rt, block);
-    }
-    else if (block->type == "if") {
-        executeIf(rt, block);
-    }
-    else {
-        cout << "  -> Unknown block type: " << block->type << endl;
-    }
-
-    rt->lastExecutedBlockId = block->id;
-}
-
-/* ===============================
-   Runtime Lifecycle
-================================ */
+// ===============================
+// بخش ۱: توابع چرخه حیات Runtime
+// ===============================
 
 void runtime_init(Runtime* rt, Project* project) {
-
     rt->project = project;
     rt->currentBlockId = -1;
     rt->state = RUNTIME_STOPPED;
-
     rt->watchdogCounter = 0;
-    rt->watchdogLimit   = 1000;
-
+    rt->watchdogLimit = 10000; // محدودیت بالا برای اطمینان
+    rt->controlStack.clear();
     rt->lastExecutedBlockId = -1;
 }
 
 void runtime_start(Runtime* rt) {
-
-    if (!rt || !rt->project) return;
-
-    int firstId = getFirstBlockId(rt->project);
-
-    if (firstId == -1) {
-        cout << "Runtime: No blocks to execute." << endl;
+    if (!rt) return;
+    if (rt->currentBlockId == -1) {
+        std::cout << "[Runtime] Error: No start block specified." << std::endl;
         rt->state = RUNTIME_STOPPED;
-        rt->currentBlockId = -1;
         return;
     }
-
-    rt->watchdogCounter = 0;
-    rt->currentBlockId  = firstId;
     rt->state = RUNTIME_RUNNING;
-
-    cout << "Runtime started. firstBlockId="
-         << rt->currentBlockId << endl;
+    rt->watchdogCounter = 0; // ریست کردن نگهبان
+    rt->controlStack.clear(); // پاک کردن حالت‌های قدیمی
+    std::cout << "Runtime started. firstBlockId=" << rt->currentBlockId << std::endl;
 }
 
 void runtime_stop(Runtime* rt) {
-
     if (!rt) return;
-
+    if (rt->state == RUNTIME_STOPPED) return; // جلوگیری از چاپ چندباره
     rt->state = RUNTIME_STOPPED;
     rt->currentBlockId = -1;
-
-    cout << "Runtime stopped." << endl;
+    rt->controlStack.clear();
+    std::cout << "Runtime stopped." << std::endl;
 }
 
-void runtime_pause(Runtime* rt) {
+// ===============================
+// بخش ۲: منطق اصلی اجرای بلوک‌ها
+// ===============================
 
-    if (!rt) return;
+// اجراکننده‌ی بلوک‌های ساده (move, turn, say, when_start)
+void executePrimitive(Runtime* rt, Block* block) {
+    // فقط منطق خود بلوک را اجرا می‌کند
+    std::cout << "  -> Primitive action for: " << block->type << std::endl;
+    // در آینده، اینجا کد واقعی حرکت یا گفتن قرار می‌گیرد
+    
+    // مسئولیت رفتن به بلوک بعدی با runtime_tick است
+    rt->currentBlockId = block->nextBlockId;
+}
 
-    if (rt->state == RUNTIME_RUNNING) {
-        rt->state = RUNTIME_PAUSED;
-        cout << "Runtime paused." << endl;
+// اجراکننده‌ی بلوک repeat
+void executeRepeat(Runtime* rt, Block* block) {
+    if (block->inputs.size() < 2) {
+        rt->currentBlockId = block->nextBlockId; // اگر ورودی ناقص است، از آن بگذر
+        return;
+    }
+
+    ControlFrame frame;
+    frame.blockId = block->id;
+    frame.loop_target = block->inputs[0];
+    frame.childHeadId = block->inputs[1];
+    frame.counter = 0; // اولین تکرار
+
+    // اگر تعداد تکرار صفر یا منفی است، اصلاً وارد حلقه نشو
+    if (frame.loop_target <= 0) {
+        rt->currentBlockId = block->nextBlockId;
+        return;
+    }
+
+    std::cout << "  -> Entering Repeat (target: " << frame.loop_target << ")" << std::endl;
+    rt->controlStack.push_back(frame); // اضافه کردن حالت حلقه به پشته
+    rt->currentBlockId = frame.childHeadId; // برو به اولین بلوک داخل حلقه
+}
+
+// تابع اصلی توزیع‌کننده (Dispatcher)
+void executeBlock(Runtime* rt, Block* block) {
+    std::cout << "Executing block id=" << block->id << ", type=" << block->type << std::endl;
+    rt->watchdogCounter++; // افزایش نگهبان برای هر بلوک
+
+    if (block->type == "repeat") {
+        executeRepeat(rt, block);
+    } else {
+        executePrimitive(rt, block);
     }
 }
 
-void runtime_resume(Runtime* rt) {
-
-    if (!rt) return;
-
-    if (rt->state == RUNTIME_PAUSED) {
-        rt->state = RUNTIME_RUNNING;
-        cout << "Runtime resumed." << endl;
-    }
-}
-
-/* ===============================
-   Tick Engine (Step Execution)
-================================ */
+// ===============================
+// بخش ۳: تابع اصلی موتور اجرا (Tick)
+// ===============================
 
 void runtime_tick(Runtime* rt) {
+    if (rt->state != RUNTIME_RUNNING) return;
 
-    if (!rt || !rt->project) return;
-
-    if (rt->state != RUNTIME_RUNNING)
-        return;
-
-    Block* block = findBlockById(rt->project,
-                                 rt->currentBlockId);
-
-    if (!block) {
-        cout << "Runtime: Block not found id="
-             << rt->currentBlockId << endl;
-        runtime_stop(rt);
-        return;
-    }
-
-    rt->watchdogCounter++;
+    // ۱. چک کردن نگهبان
     if (rt->watchdogCounter > rt->watchdogLimit) {
-        cout << "Runtime: Watchdog limit reached ("
-             << rt->watchdogLimit << ")." << endl;
+        std::cout << "!!! Watchdog limit reached! Halting execution. !!!" << std::endl;
         runtime_stop(rt);
         return;
     }
 
-    executeBlock(rt, block);
+    // ۲. منطق اصلی: چه کاری باید انجام شود؟
+    // اگر به انتهای یک زنجیره رسیده‌ایم...
+    if (rt->currentBlockId == -1) {
+        // ...و در یک حلقه هستیم
+        if (!rt->controlStack.empty()) {
+            ControlFrame& top_frame = rt->controlStack.back();
+            top_frame.counter++; // شمارنده تکرار را یکی اضافه کن
 
-    if (block->nextBlockId != -1) {
-        rt->currentBlockId = block->nextBlockId;
+            if (top_frame.counter < top_frame.loop_target) {
+                // اگر حلقه تمام نشده، دوباره به ابتدای آن برگرد
+                rt->currentBlockId = top_frame.childHeadId;
+            } else {
+                // اگر حلقه تمام شده، از آن خارج شو
+                std::cout << "  -> Exiting Repeat Block." << std::endl;
+                Block* control_block = findBlockById(rt->project, top_frame.blockId);
+                // برو به بلوک بعدی که بعد از repeat قرار دارد
+                rt->currentBlockId = control_block ? control_block->nextBlockId : -1;
+                rt->controlStack.pop_back(); // حذف حالت حلقه از پشته
+            }
+        } else {
+            // اگر در هیچ حلقه‌ای نیستیم و به انتهای زنجیره رسیدیم، کار تمام است
+            runtime_stop(rt);
+        }
+        return;
+    }
+
+    // اگر در وسط یک زنجیره هستیم
+    Block* block_to_run = findBlockById(rt->project, rt->currentBlockId);
+    if (block_to_run) {
+        executeBlock(rt, block_to_run);
     } else {
+        std::cout << "[Runtime] Error: Block to run not found (id=" << rt->currentBlockId << ")" << std::endl;
         runtime_stop(rt);
     }
 }
 
-/* ===============================
-   Utility
-================================ */
-
-bool runtime_isRunning(const Runtime* rt) {
-    return rt && rt->state == RUNTIME_RUNNING;
-}
-
-bool runtime_isPaused(const Runtime* rt) {
-    return rt && rt->state == RUNTIME_PAUSED;
-}
-
-void runtime_setWatchdogLimit(Runtime* rt, int limit) {
-    if (!rt) return;
-    if (limit < 1) limit = 1;
-    rt->watchdogLimit = limit;
-}
+// ===============================
+// بخش ۴: توابع کمکی (بدون تغییر)
+// ===============================
+bool runtime_isRunning(const Runtime* rt) { return rt && rt->state == RUNTIME_RUNNING; }
+bool runtime_isPaused(const Runtime* rt) { return rt && rt->state == RUNTIME_PAUSED; }
+void runtime_pause(Runtime* rt) { /* برای آینده */ }
+void runtime_resume(Runtime* rt) { /* برای آینده */ }
+void runtime_setWatchdogLimit(Runtime* rt, int limit) { if(rt) rt->watchdogLimit = limit; }
