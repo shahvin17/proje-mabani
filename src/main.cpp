@@ -148,13 +148,19 @@ int main() {
 #include "render.h"
 
 int main(int argc, char* argv[]) {
+
+    std::cout << "=== SDL Test Starting ===" << std::endl;
+
+    // =========================
+    // SDL INIT
+    // =========================
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        std::cerr << "SDL init failed\n";
+        std::cerr << "SDL init failed: " << SDL_GetError() << std::endl;
         return 1;
     }
 
     SDL_Window* window = SDL_CreateWindow(
-        "Scratch - Day 1 (A)",
+        "Scratch - SDL Day1 Test",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         800,
@@ -163,43 +169,62 @@ int main(int argc, char* argv[]) {
     );
 
     if (!window) {
-        std::cerr << "Window creation failed\n";
+        std::cerr << "Window creation failed: " << SDL_GetError() << std::endl;
         SDL_Quit();
         return 1;
     }
 
-    SDL_Renderer* renderer = SDL_CreateRenderer(
-        window, -1, SDL_RENDERER_ACCELERATED
-    );
+    SDL_Renderer* renderer =
+        SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     if (!renderer) {
-        std::cerr << "Renderer creation failed\n";
+        std::cerr << "Renderer creation failed: " << SDL_GetError() << std::endl;
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
     }
-    
+
+    std::cout << "SDL successfully initialized!" << std::endl;
+
+    // =========================
+    // Create Test Rectangle
+    // =========================
+    DragRect rect{ 200, 150, 200, 120, false };
+
     bool running = true;
     SDL_Event event;
 
+    // =========================
+    // Main Loop
+    // =========================
     while (running) {
+
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
             }
         }
 
+        // Background color
         SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
         SDL_RenderClear(renderer);
 
-        renderRect(renderer);
+        // Draw rectangle
+        renderRect(renderer, rect);
 
         SDL_RenderPresent(renderer);
-        SDL_Delay(16);
+
+        SDL_Delay(16); // ~60 FPS
     }
 
+    // =========================
+    // Cleanup
+    // =========================
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+
+    std::cout << "=== SDL Test Finished ===" << std::endl;
+
     return 0;
 }
