@@ -12,6 +12,14 @@ enum RuntimeState {
     RUNTIME_PAUSED
 };
 
+// --- تغییر اصلی: اضافه کردن ساختار برای مدیریت حالت حلقه ---
+struct ControlFrame {
+    int blockId;      // آی‌دی بلوک repeat
+    int counter;      // شمارنده فعلی حلقه
+    int loop_target;  // تعداد تکرار مورد نیاز
+    int childHeadId;  // آی‌دی اولین بلوک داخل حلقه
+};
+
 struct Runtime {
     Project* project;
     int currentBlockId;
@@ -20,7 +28,9 @@ struct Runtime {
     int watchdogCounter;
     int watchdogLimit;
 
-    // برای گزارش/دیباگ
+    // --- پشته برای مدیریت حلقه‌های تو در تو ---
+    std::vector<ControlFrame> controlStack;
+
     int lastExecutedBlockId;
 
     //day4
@@ -29,19 +39,13 @@ struct Runtime {
 
 };
 
-// init / lifecycle
+// بقیه تعاریف توابع بدون تغییر
 void runtime_init(Runtime* rt, Project* project);
 void runtime_start(Runtime* rt);
 void runtime_stop(Runtime* rt);
-
-// pause/resume
 void runtime_pause(Runtime* rt);
 void runtime_resume(Runtime* rt);
-
-// tick-based execution (روز 2)
 void runtime_tick(Runtime* rt);
-
-// helpers
 bool runtime_isRunning(const Runtime* rt);
 bool runtime_isPaused(const Runtime* rt);
 void runtime_setWatchdogLimit(Runtime* rt, int limit);
