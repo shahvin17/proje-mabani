@@ -1,230 +1,118 @@
-/*#include <iostream>
-#include "core_types.h"
-#include "runtime.h"
-#include "persist.h"
-#include <vars_ops.h>
-using namespace std;
-
-int main() {
-
-    cout << "=== Day 1 Runtime Test ===" << endl;
-
-    // ساخت پروژه تستی
-    Project project;
-
-    // بلاک اول
-    Block b1;
-    b1.id = 1;
-    b1.type = "move";
-    b1.nextBlockId = 2;
-    b1.x = 0;
-    b1.y = 0;
-
-    // بلاک دوم
-    Block b2;
-    b2.id = 2;
-    b2.type = "turn";
-    b2.nextBlockId = -1;
-    b2.x = 0;
-    b2.y = 0;
-
-    project.blocks.push_back(b1);
-    project.blocks.push_back(b2);
-
-    // ساخت runtime
-    Runtime rt;
-    runtime_init(&rt, &project);
-
-    runtime_start(&rt);
-
-    while (runtime_isRunning(&rt)) {
-        runtime_tick(&rt);
-    }
-
-    cout << "=== Execution Finished ===" << endl;
-
-    // تست Save
-    if (saveProject(project, "test_project.txt")) {
-        cout << "Project saved successfully." << endl;
-    } else {
-        cout << "Save failed." << endl;
-    }
-    Project loaded;
-
-    if (loadProject(loaded, "test_project.txt")) {
-        cout << "Load successful." << endl;
-        cout << "Loaded blocks count: " << loaded.blocks.size() << endl;
-    } else {
-        cout << "Load failed." << endl;
-    }
-    return 0;
-}
-*/
-
-/*#include <iostream>
-#include "core_types.h"
-#include "runtime.h"
-
-using namespace std;
-
-int main() {
-
-    cout << "=== Scratch Engine Day 4 Test ===" << endl;
-
-    Project project;
-
-    /*
-        Block layout:
-
-        1: move
-        2: repeat (2 times, child=3)
-        3: move (inside repeat)
-        4: if (true, child=5)
-        5: turn
-        6: turn (after repeat)
-
-        chain:
-        1 -> 2 -> 6
-        3 -> 4
-    
-
-    Block b1;
-    b1.id = 1;
-    b1.type = "move";
-    b1.nextBlockId = 2;
-
-    Block b2;
-    b2.id = 2;
-    b2.type = "repeat";
-    b2.inputs = {2, 3};   // repeat 2 times, child id=3
-    b2.nextBlockId = 6;
-
-    Block b3;
-    b3.id = 3;
-    b3.type = "move";
-    b3.nextBlockId = 4;
-
-    Block b4;
-    b4.id = 4;
-    b4.type = "if";
-    b4.inputs = {1, 5};   // condition true, child=5
-    b4.nextBlockId = -1;
-
-    Block b5;
-    b5.id = 5;
-    b5.type = "turn";
-    b5.nextBlockId = -1;
-
-    Block b6;
-    b6.id = 6;
-    b6.type = "turn";
-    b6.nextBlockId = -1;
-
-    project.blocks.push_back(b1);
-    project.blocks.push_back(b2);
-    project.blocks.push_back(b3);
-    project.blocks.push_back(b4);
-    project.blocks.push_back(b5);
-    project.blocks.push_back(b6);
-
-    Runtime rt;
-    runtime_init(&rt, &project);
-    runtime_start(&rt);
-
-    while (runtime_isRunning(&rt)) {
-        runtime_tick(&rt);
-    }
-
-    cout << "=== Execution Finished ===" << endl;
-
-    return 0;
-}
-*/
-
-
-
 #include <SDL2/SDL.h>
 #include <iostream>
+#include <vector>
+#include <map>
+
+#include "core_types.h"
 #include "render.h"
+#include "runtime.h"
+
+// تعریف یک پالت رنگ برای بلوک‌ها (اختیاری ولی برای خوانایی بهتر)
+map<string, SDL_Color> block_colors = {
+    {"when_start", {255, 170, 0, 255}},   // زرد/نارنجی
+    {"move", {70, 140, 255, 255}},        // آبی
+    {"turn", {70, 140, 255, 255}},        // آبی
+    {"repeat", {255, 120, 50, 255}},     // نارنجی
+    {"say", {160, 100, 255, 255}},        // بنفش
+    {"default", {150, 150, 150, 255}}      // خاکستری
+};
+
+SDL_Color getColorForBlock(const string& type) {
+    if (block_colors.count(type)) {
+        return block_colors[type];
+    }
+    return block_colors["default"];
+}
 
 int main(int argc, char* argv[]) {
+    // 1. آماده‌سازی
+    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Window* window = SDL_CreateWindow("Scratch Project - UI Core", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1024, 768, SDL_WINDOW_SHOWN);
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
-    std::cout << "=== SDL Test Starting ===" << std::endl;
+    Project project;
+    project.blocks.push_back({1, "when_start", {}, 2, 50, 50});
+    project.blocks.push_back({2, "move", {10}, 3, 50, 120});
+    project.blocks.push_back({3, "repeat", {4, 4}, 5, 50, 190});
+    project.blocks.push_back({4, "turn", {15}, -1, 150, 220});
+    project.blocks.push_back({5, "say", {}, -1, 50, 260});
 
-    // =========================
-    // SDL INIT
-    // =========================
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        std::cerr << "SDL init failed: " << SDL_GetError() << std::endl;
-        return 1;
-    }
+    Runtime rt;
+    runtime_init(&rt, &project);
 
-    SDL_Window* window = SDL_CreateWindow(
-        "Scratch - SDL Day1 Test",
-        SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED,
-        800,
-        600,
-        SDL_WINDOW_SHOWN
-    );
-
-    if (!window) {
-        std::cerr << "Window creation failed: " << SDL_GetError() << std::endl;
-        SDL_Quit();
-        return 1;
-    }
-
-    SDL_Renderer* renderer =
-        SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-
-    if (!renderer) {
-        std::cerr << "Renderer creation failed: " << SDL_GetError() << std::endl;
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return 1;
-    }
-
-    std::cout << "SDL successfully initialized!" << std::endl;
-
-    // =========================
-    // Create Test Rectangle
-    // =========================
-    DragRect rect{ 200, 150, 200, 120, false };
-
+    // 2. متغیرهای حلقه
     bool running = true;
     SDL_Event event;
+    Block* dragging_block = nullptr;
+    int offset_x = 0;
+    int offset_y = 0;
 
-    // =========================
-    // Main Loop
-    // =========================
+    // 3. حلقه اصلی
     while (running) {
-
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                running = false;
+            if (event.type == SDL_QUIT) running = false;
+
+            switch (event.type) {
+                case SDL_MOUSEBUTTONDOWN:
+                    for (int i = project.blocks.size() - 1; i >= 0; --i) {
+                        Block& b = project.blocks[i];
+                        SDL_Rect r = {(int)b.x, (int)b.y, (int)b.width, (int)b.height};
+                        if (isInside(r, event.button.x, event.button.y)) {
+                            dragging_block = &b;
+                            offset_x = event.button.x - b.x;
+                            offset_y = event.button.y - b.y;
+                            break;
+                        }
+                    }
+                    break;
+
+                case SDL_MOUSEBUTTONUP:
+                    dragging_block = nullptr;
+                    break;
+
+                case SDL_MOUSEMOTION:
+                    if (dragging_block) {
+                        dragging_block->x = event.motion.x - offset_x;
+                        dragging_block->y = event.motion.y - offset_y;
+                    }
+                    break;
+                
+                case SDL_KEYDOWN:
+                    if (event.key.keysym.sym == SDLK_r) {
+                        cout << "[INFO] 'R' key pressed. Starting runtime..." << endl;
+                        for(const auto& block : project.blocks) {
+                            if (block.type == "when_start") {
+                                rt.currentBlockId = block.id;
+                                break;
+                            }
+                        }
+                        runtime_start(&rt);
+                    }
+                    break;
             }
         }
 
-        // Background color
-        SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
+        if (runtime_isRunning(&rt)) {
+            runtime_tick(&rt);
+        }
+
+        SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
         SDL_RenderClear(renderer);
 
-        // Draw rectangle
-        renderRect(renderer, rect);
+        for (const auto& block : project.blocks) {
+            SDL_Rect r = {(int)block.x, (int)block.y, (int)block.width, (int)block.height};
+            SDL_Color color = getColorForBlock(block.type);
+            renderRect(renderer, r, color);
+        }
 
         SDL_RenderPresent(renderer);
-
-        SDL_Delay(16); // ~60 FPS
+        SDL_Delay(16);
     }
 
-    // =========================
-    // Cleanup
-    // =========================
+    // 4. آزادسازی
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
-
-    std::cout << "=== SDL Test Finished ===" << std::endl;
-
     return 0;
 }
+

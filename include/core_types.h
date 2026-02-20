@@ -3,14 +3,18 @@
 
 #include <vector>
 #include <string>
+
 using namespace std;
 
 struct Block {
     int id;
-    string type;              // فعلاً string نگه می‌داریم
+    string type;
     vector<int> inputs;
     int nextBlockId;
     float x, y;
+    // --- تغییر اینجاست ---
+    float width = 200.0f; // عرض پیش‌فرض بلوک
+    float height = 60.0f;  // ارتفاع پیش‌فرض بلوک
 };
 
 struct Sprite {

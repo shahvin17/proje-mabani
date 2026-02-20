@@ -1,12 +1,13 @@
 #include "render.h"
 
-void renderRect(SDL_Renderer* renderer, const DragRect& r) {
-    SDL_Rect rect{ r.x, r.y, r.w, r.h };
-    SDL_SetRenderDrawColor(renderer, 255, 80, 80, 255);
-    SDL_RenderFillRect(renderer, &rect);
+// --- تغییر اینجاست ---
+
+void renderRect(SDL_Renderer* renderer, const SDL_Rect& r, const SDL_Color& color) {
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+    SDL_RenderFillRect(renderer, &r);
 }
 
-bool isInside(const DragRect& r, int mx, int my) {
+bool isInside(const SDL_Rect& r, int mx, int my) {
     return (mx >= r.x && mx <= r.x + r.w &&
             my >= r.y && my <= r.y + r.h);
 }

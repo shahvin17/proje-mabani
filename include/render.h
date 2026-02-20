@@ -1,13 +1,14 @@
 #ifndef RENDER_H
 #define RENDER_H
+
 #include <SDL2/SDL.h>
 
-struct DragRect {
-    int x, y;
-    int w, h;
-    bool dragging;
-};
+// ساختار DragRect حذف شد
 
-void renderRect(SDL_Renderer* renderer, const DragRect& r);
-bool isInside(const DragRect& r, int mx, int my);
+// تابع برای رندر یک مستطیل SDL
+void renderRect(SDL_Renderer* renderer, const SDL_Rect& r, const SDL_Color& color);
+
+// تابع برای بررسی برخورد نقطه با مستطیل SDL
+bool isInside(const SDL_Rect& r, int mx, int my);
+
 #endif
