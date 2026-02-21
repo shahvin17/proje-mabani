@@ -37,3 +37,12 @@ void safety_reset_watchdog(WatchdogState& wd) {
 bool safety_check_watchdog(WatchdogState& wd, string& out_error_message) {
     wd.current_frame_instructions++;
 
+
+    if (wd.current_frame_instructions > wd.max_allowed_instructions) {
+
+        out_error_message = "[Watchdog Error] Infinite loop detected! Script halted.";
+        return true;
+    }
+
+    return false;
+}
