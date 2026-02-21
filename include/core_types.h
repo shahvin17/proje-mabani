@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <string>
-
+#include "pen.h"
 using namespace std;
 
 struct Block {
