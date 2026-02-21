@@ -26,6 +26,7 @@ struct Sprite {
     float width = 50.0f;
     float height = 50.0f;
     bool draggable = false;
+    PenState pen_state;
 };
 
 struct Project {
