@@ -1,73 +1,60 @@
 #include <SDL2/SDL.h>
-#include <core_types.h>
 #include <iostream>
 #include <vector>
 #include <map>
 #include <string>
-#include <render.h>
-#include <runtime.h>
-// کصخل هدر هاشو تغییر بده
-// ... (بخش رنگ‌ها و توابع کمکی بدون تغییر) ...
-std::map<std::string, SDL_Color> block_colors = {
-    {"when_start", {255, 170, 0, 255}},
-    {"move", {70, 140, 255, 255}},
-    {"turn", {70, 140, 255, 255}},
-    {"repeat", {255, 120, 50, 255}},
-    {"say", {160, 100, 255, 255}},
-    {"default", {150, 150, 150, 255}}
-};
-SDL_Color getColorForBlock(const std::string& type) { if (block_colors.count(type)) return block_colors[type]; return block_colors["default"]; }
-Block* findBlockById(std::vector<Block>& blocks, int id) { for (auto& b : blocks) if (b.id == id) return &b; return nullptr; }
+
+#include "core_types.h"
+#include "render.h"
+#include "runtime.h"
+
+// ==========================================
+// بخش ۱: Forward Declarations (اعلان توابع)
+// ==========================================
+// به کامپایلر می‌گوییم که این توابع در ادامه تعریف خواهند شد.
+SDL_Color getColorForBlock(const std::string& type);
+Block* findBlockById(std::vector<Block>& blocks, int id);
 
 
+// ==========================================
+// بخش ۲: تابع اصلی برنامه
+// ==========================================
 int main(int argc, char* argv[]) {
     // 1. آماده‌سازی
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window* window = SDL_CreateWindow("Scratch Clone - Final Test", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_SHOWN);
+    if (!text_init("assets/font.ttf", 14)) return 1;
+
+    SDL_Window* window = SDL_CreateWindow("Scratch Final Project", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_SHOWN);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     SDL_Rect palette_area = {0, 0, 250, 720};
     SDL_Rect script_area = {250, 0, 1280 - 250, 720};
 
-    // --- تغییر اصلی: بازنویسی کامل داده‌های تستی ---
-    
-    // بلوک‌های قالب برای پالت (بدون تغییر)
     std::vector<Block> template_blocks;
     template_blocks.push_back({-1, "when_start", {}, -1, 30, 30});
     template_blocks.push_back({-2, "move", {10}, -1, 30, 100});
-    template_blocks.push_back({-3, "repeat", {4, 4}, -1, 30, 170}); // مقدار childId (دومین 4) در اینجا مهم نیست
-    template_blocks.push_back({-4, "turn", {15}, -1, 30, 240});
+    template_blocks.push_back({-3, "turn", {15}, -1, 30, 170});
+    template_blocks.push_back({-4, "repeat", {4, -1}, -1, 30, 240});
     template_blocks.push_back({-5, "say", {}, -1, 30, 310});
+    template_blocks.push_back({-6, "pen_down", {}, -1, 30, 380});
+    template_blocks.push_back({-7, "pen_up", {}, -1, 30, 450});
 
-    // پروژه را با یک اسکریپت از پیش ساخته شده برای تست شروع می‌کنیم
     Project project;
-    // زنجیره اصلی: when_start -> move -> repeat -> say
-    project.blocks.push_back({1, "when_start", {}, 2, 300, 50});
-    project.blocks.push_back({2, "move", {10}, 3, 300, 120});
-    // بلوک repeat: ۴ بار تکرار کن، فرزند اولش بلوک با id=4 است
-    project.blocks.push_back({3, "repeat", {4, 4}, 5, 300, 190});
-    project.blocks.push_back({5, "say", {}, -1, 300, 320});
+    project.sprites.push_back({1, "Sprite1", 600, 360, 90.0, true});
     
-    // فرزند حلقه repeat: فقط یک بلوک turn
-    project.blocks.push_back({4, "turn", {15}, -1, 450, 220}); // این بلوک داخل حلقه اجرا می‌شود
-
     Runtime rt;
     runtime_init(&rt, &project);
-    int next_block_id = 6; // چون تا id=5 استفاده کرده‌ایم
+    int next_block_id = 1;
 
-    // ... (بقیه متغیرهای حلقه بدون تغییر) ...
     bool running = true;
     SDL_Event event;
     Block* dragging_block = nullptr;
     int offset_x = 0, offset_y = 0;
-
-    // ... (کل حلقه while و منطق Drag/Drop/Snap/Render بدون تغییر باقی می‌ماند) ...
-    // ... (برای جلوگیری از تکرار، کد کامل حلقه در اینجا حذف شده، شما نیازی به تغییر آن ندارید) ...
-    // ... (همان کد کامل و صحیح قبلی را استفاده کنید) ...
     
-    // فقط برای اطمینان، کد کامل حلقه while را هم اینجا قرار می‌دهم:
     while (running) {
+        // --- Event Handling ---
         while (SDL_PollEvent(&event)) {
+            // ... (این بخش بزرگ تغییری نکرده و مانند قبل است) ...
             if (event.type == SDL_QUIT) running = false;
             switch (event.type) {
                 case SDL_MOUSEBUTTONDOWN: {
@@ -128,18 +115,40 @@ int main(int argc, char* argv[]) {
                     break;
                 case SDL_KEYDOWN:
                     if (event.key.keysym.sym == SDLK_r) {
-                        runtime_init(&rt, &project); // ریست کردن runtime قبل از هر اجرا
+                        runtime_init(&rt, &project);
                         for (const auto& b : project.blocks) if (b.type == "when_start") { rt.currentBlockId = b.id; runtime_start(&rt); break; }
                     }
                     break;
             }
         }
+
+        // --- Runtime Tick ---
         if (runtime_isRunning(&rt)) runtime_tick(&rt);
+
+        // --- Rendering ---
         SDL_SetRenderDrawColor(renderer, 45, 45, 45, 255); SDL_RenderFillRect(renderer, &palette_area);
-        SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255); SDL_RenderFillRect(renderer, &script_area);
-        for (const auto& b : template_blocks) { SDL_Rect r = {(int)b.x, (int)b.y, (int)b.width, (int)b.height}; renderRect(renderer, r, getColorForBlock(b.type)); }
-        for (const auto& b : project.blocks) { SDL_Rect r = {(int)b.x, (int)b.y, (int)b.width, (int)b.height}; renderRect(renderer, r, getColorForBlock(b.type)); }
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 180);
+        SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255); SDL_RenderFillRect(renderer, &script_area);
+
+        // Render template blocks
+        for (const auto& block : template_blocks) {
+            SDL_Rect r = {(int)block.x, (int)block.y, (int)block.width, (int)block.height};
+            renderRect(renderer, r, getColorForBlock(block.type));
+            render_text(renderer, block.type, block.x + 10, block.y + (block.height/2) - 8, {255,255,255});
+        }
+        // Render script blocks
+        for (const auto& block : project.blocks) {
+            SDL_Rect r = {(int)block.x, (int)block.y, (int)block.width, (int)block.height};
+            renderRect(renderer, r, getColorForBlock(block.type));
+            render_text(renderer, block.type, block.x + 10, block.y + (block.height/2) - 8, {255,255,255});
+        }
+        // Render sprite
+        if (!project.sprites.empty()) {
+            Sprite& s = project.sprites[0];
+            SDL_Rect sprite_rect = {(int)s.x - (int)s.width/2, (int)s.y - (int)s.height/2, (int)s.width, (int)s.height};
+            renderRect(renderer, sprite_rect, {255, 165, 0, 255});
+        }
+        // Render connection lines
+        SDL_SetRenderDrawColor(renderer, 20, 20, 20, 180);
         for (auto& b : project.blocks) {
             if (b.nextBlockId != -1) {
                 Block* nb = findBlockById(project.blocks, b.nextBlockId);
@@ -150,8 +159,43 @@ int main(int argc, char* argv[]) {
         SDL_Delay(16);
     }
 
+    // 4. آزادسازی منابع
+    text_quit();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;
+}
+
+
+// ==========================================
+// بخش ۳: تعریف توابع کمکی
+// ==========================================
+
+// نقشه رنگ‌ها
+std::map<std::string, SDL_Color> block_colors = {
+    {"when_start", {255, 170, 0, 255}},
+    {"move", {70, 140, 255, 255}},
+    {"turn", {70, 140, 255, 255}},
+    {"repeat", {255, 120, 50, 255}},
+    {"say", {160, 100, 255, 255}},
+    {"pen_down", {0, 180, 140, 255}},
+    {"pen_up", {0, 180, 140, 255}},
+    {"default", {150, 150, 150, 255}}
+};
+
+SDL_Color getColorForBlock(const std::string& type) {
+    if (block_colors.count(type)) {
+        return block_colors[type];
+    }
+    return block_colors["default"];
+}
+
+Block* findBlockById(std::vector<Block>& blocks, int id) {
+    for (auto& b : blocks) {
+        if (b.id == id) {
+            return &b;
+        }
+    }
+    return nullptr;
 }
