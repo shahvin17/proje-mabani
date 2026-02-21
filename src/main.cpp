@@ -17,6 +17,10 @@ std::map<std::string, SDL_Color> block_colors = {
     {"say", {160, 100, 255, 255}},
     {"default", {150, 150, 150, 255}}
 };
+
+struct looks {
+    bool visible;
+};
 SDL_Color getColorForBlock(const std::string& type) { if (block_colors.count(type)) return block_colors[type]; return block_colors["default"]; }
 Block* findBlockById(std::vector<Block>& blocks, int id) { for (auto& b : blocks) if (b.id == id) return &b; return nullptr; }
 
@@ -31,7 +35,7 @@ int main(int argc, char* argv[]) {
     SDL_Rect script_area = {250, 0, 1280 - 250, 720};
 
     // --- تغییر اصلی: بازنویسی کامل داده‌های تستی ---
-    
+
     // بلوک‌های قالب برای پالت (بدون تغییر)
     std::vector<Block> template_blocks;
     template_blocks.push_back({-1, "when_start", {}, -1, 30, 30});
@@ -48,7 +52,7 @@ int main(int argc, char* argv[]) {
     // بلوک repeat: ۴ بار تکرار کن، فرزند اولش بلوک با id=4 است
     project.blocks.push_back({3, "repeat", {4, 4}, 5, 300, 190});
     project.blocks.push_back({5, "say", {}, -1, 300, 320});
-    
+
     // فرزند حلقه repeat: فقط یک بلوک turn
     project.blocks.push_back({4, "turn", {15}, -1, 450, 220}); // این بلوک داخل حلقه اجرا می‌شود
 
@@ -65,7 +69,7 @@ int main(int argc, char* argv[]) {
     // ... (کل حلقه while و منطق Drag/Drop/Snap/Render بدون تغییر باقی می‌ماند) ...
     // ... (برای جلوگیری از تکرار، کد کامل حلقه در اینجا حذف شده، شما نیازی به تغییر آن ندارید) ...
     // ... (همان کد کامل و صحیح قبلی را استفاده کنید) ...
-    
+
     // فقط برای اطمینان، کد کامل حلقه while را هم اینجا قرار می‌دهم:
     while (running) {
         while (SDL_PollEvent(&event)) {
@@ -154,5 +158,8 @@ int main(int argc, char* argv[]) {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+
+    Looks playerLooks;
+    playerLooks.visible = true;
     return 0;
 }
