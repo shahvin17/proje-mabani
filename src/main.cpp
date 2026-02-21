@@ -4,6 +4,8 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <render.h>
+#include <runtime.h>
 // کصخل هدر هاشو تغییر بده
 // ... (بخش رنگ‌ها و توابع کمکی بدون تغییر) ...
 std::map<std::string, SDL_Color> block_colors = {
