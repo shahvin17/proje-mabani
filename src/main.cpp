@@ -265,20 +265,36 @@ int main(int argc, char* argv[]) {
     Runtime rt;
     runtime_init(&rt, &project);
 
-    int next_block_id = 100; // IDهای بلوک‌های script از 100 شروع می‌شوند
+    int next_block_id = 100;
 
-    // ── اضافه کردن یک بلوک when_start پیش‌فرض برای راحتی کاربر ──
-    {
+    // ── تابع کمکی: ساخت پروژه پیش‌فرض (sprite + when_start) ──
+    auto setup_default_project = [&]() {
+        project.sprites.clear();
+        // Sprite1 پیش‌فرض
+        Sprite spr;
+        spr.id           = 1;
+        spr.name         = "Sprite1";
+        spr.x            = 0.0f;
+        spr.y            = 0.0f;
+        spr.direction    = 90.0f;
+        spr.visible      = true;
+        spr.width        = 48.0f;
+        spr.height       = 48.0f;
+        spr.size_percent = 100.0f;
+        project.sprites.push_back(spr);
+        // بلوک when_start پیش‌فرض
         Block b;
-        b.id = next_block_id++;
-        b.type = "when_start";
-        b.x = SIDEBAR_W + 40;
-        b.y = TOOLBAR_H + 40;
+        b.id          = next_block_id++;
+        b.type        = "when_start";
+        b.x           = SIDEBAR_W + 40;
+        b.y           = TOOLBAR_H + 40;
         b.nextBlockId = -1;
-        b.width  = BLOCK_W;
-        b.height = BLOCK_H;
+        b.width       = BLOCK_W;
+        b.height      = BLOCK_H;
         project.blocks.push_back(b);
-    }
+    };
+
+    setup_default_project();
 
     UIState ui;
     bool running = true;
@@ -332,14 +348,23 @@ int main(int argc, char* argv[]) {
                 }
                 else if (SDL_PointInRect(&mp, &btn_load)) {
                     if (loadProject(project, "project.fop")) {
+                        // اگر فایل قدیمی sprite نداشت، یه sprite پیش‌فرض اضافه کن
+                        if (project.sprites.empty()) {
+                            Sprite spr; spr.id=1; spr.name="Sprite1";
+                            spr.x=0; spr.y=0; spr.direction=90;
+                            spr.visible=true; spr.width=48; spr.height=48;
+                            spr.size_percent=100;
+                            project.sprites.push_back(spr);
+                        }
                         runtime_init(&rt, &project);
                         logInfo("Project loaded.");
                     }
                 }
                 else if (SDL_PointInRect(&mp, &btn_new)) {
                     newProject(project);
-                    runtime_init(&rt, &project);
                     next_block_id = 100;
+                    setup_default_project();
+                    runtime_init(&rt, &project);
                     logInfo("New project created.");
                 }
 
@@ -657,46 +682,45 @@ int main(int argc, char* argv[]) {
         drawRect(renderer, stage_x, stage_y, STAGE_W-20, STAGE_H, {100,100,100,255});
 
         // رندر spriteها
+        // مختصات Scratch: x=0,y=0 مرکز stage. x از -240 تا +240، y از -180 تا +180
+        // مختصات Stage روی صفحه: stage_x..stage_x+STAGE_W-20
+        int stage_w = STAGE_W - 20;
+        int stage_h = STAGE_H;
         for (auto& spr : project.sprites) {
             if (!spr.visible) continue;
-            int sx = stage_x + (int)(spr.x * (STAGE_W-20) / 480.0f) + (STAGE_W-20)/2;
-            int sy = stage_y + STAGE_H/2 - (int)(spr.y * STAGE_H / 360.0f);
-            int sw = (int)(spr.width  * spr.width  / 100.0f);
-            int sh = (int)(spr.height * spr.height / 100.0f);
-            sw = std::max(sw, 10); sh = std::max(sh, 10);
-            // رندر ساده: مستطیل نارنجی (جایگزین تصویر واقعی)
+            // تبدیل مختصات Scratch به pixel
+            int sx = stage_x + stage_w/2 + (int)(spr.x * stage_w / 480.0f);
+            int sy = stage_y + stage_h/2 - (int)(spr.y * stage_h / 360.0f);
+            // اندازه sprite با size_percent
+            int sw = (int)(spr.width  * spr.size_percent / 100.0f);
+            int sh = (int)(spr.height * spr.size_percent / 100.0f);
+            sw = std::max(sw, 8); sh = std::max(sh, 8);
+            // clamp داخل stage
+            sx = std::max(stage_x + sw/2, std::min(sx, stage_x + stage_w - sw/2));
+            sy = std::max(stage_y + sh/2, std::min(sy, stage_y + stage_h - sh/2));
+            // رندر sprite (مستطیل نارنجی)
             fillRect(renderer, sx-sw/2, sy-sh/2, sw, sh, {255, 165, 0, 220});
-            drawRect(renderer, sx-sw/2, sy-sh/2, sw, sh, {200,100,0,255});
+            drawRect(renderer, sx-sw/2, sy-sh/2, sw, sh, {200, 100, 0, 255});
+            // نام sprite زیرش
             if (font_small) renderText(renderer, font_small, spr.name,
-                sx-sw/2+2, sy+sh/2+2, {50,50,50,255});
+                sx - sw/2, sy + sh/2 + 2, {40, 40, 40, 255});
         }
 
-        // اگر هیچ sprite‌ای نیست، یک sprite پیش‌فرض نشان بده
-        if (project.sprites.empty()) {
-            int cx = stage_x + (STAGE_W-20)/2;
-            int cy = stage_y + STAGE_H/2;
-            fillRect(renderer, cx-25, cy-25, 50, 50, {255, 165, 0, 220});
-            drawRect(renderer, cx-25, cy-25, 50, 50, {200,100,0,255});
-            if (font_small) renderText(renderer, font_small, "Sprite1",
-                cx-20, cy+27, {80,80,80,255});
-        }
-
-        // Sprite info پایین stage
+        // Sprite info پایین stage (live x,y,direction)
         {
             int info_y = area_stage.y + STAGE_H + 20;
             if (font_small) {
-                renderText(renderer, font_small, "Sprite:",
-                    area_stage.x+10, info_y, {180,180,180,255});
-                renderText(renderer, font_small,
-                    project.sprites.empty() ? "Sprite1" : project.sprites[0].name,
-                    area_stage.x+55, info_y, {255,255,255,255});
+                std::string spr_name = project.sprites.empty() ? "Sprite1" : project.sprites[0].name;
+                float x_val  = project.sprites.empty() ? 0.0f : project.sprites[0].x;
+                float y_val  = project.sprites.empty() ? 0.0f : project.sprites[0].y;
+                float d_val  = project.sprites.empty() ? 90.0f: project.sprites[0].direction;
 
-                float sx_val = project.sprites.empty() ? 0 : project.sprites[0].x;
-                float sy_val = project.sprites.empty() ? 0 : project.sprites[0].y;
-                std::string pos = "x:" + std::to_string((int)sx_val) +
-                                  "  y:" + std::to_string((int)sy_val);
-                renderText(renderer, font_small, pos,
-                    area_stage.x+10, info_y+18, {160,160,160,255});
+                renderText(renderer, font_small, "Sprite: " + spr_name,
+                    area_stage.x+10, info_y, {200,200,200,255});
+                std::string xy  = "x:" + std::to_string((int)x_val) + "  y:" + std::to_string((int)y_val);
+                std::string dir = "dir:" + std::to_string((int)d_val);
+                renderText(renderer, font_small, xy,  area_stage.x+10, info_y+18, {160,220,160,255});
+                renderText(renderer, font_small, dir, area_stage.x+10, info_y+34, {160,160,220,255});
             }
         }
 
