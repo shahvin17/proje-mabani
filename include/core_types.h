@@ -30,8 +30,11 @@ struct Sprite {
 
     // --- Looks ---
     string say_message  = "";
-    float  say_timer    = 0.0f;   // -1 = نامحدود, 0 = خاموش
+    float  say_timer    = 0.0f;
     float  size_percent = 100.0f;
+
+    // --- Costume (تصویر) ---
+    string costume_path = "";   // مسیر فایل PNG مثلاً assets/photos/sprite1.png
 
     PenState pen_state;
 };

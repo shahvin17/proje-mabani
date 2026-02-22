@@ -1,4 +1,6 @@
 #include "runtime.h"
+#include "vars_ops.h"
+#include <cmath>
 #include "motion.h"
 #include "looks.h"
 #include <iostream>
@@ -78,6 +80,42 @@ static void executePrimitive(Runtime* rt, Block* block){
     else if(block->type=="hide" && spr){ looks_hide(*spr); }
     else if(block->type=="set_size" && spr){
         looks_set_size(*spr, block->inputs.empty() ? 100 : (float)block->inputs[0]);
+    }
+    // ── عملگرها ──
+    else if(block->type.substr(0,3)=="op_"){
+        if(block->inputs.size() >= 2){
+            Value a = value_number(block->inputs[0]);
+            Value b_val = value_number(block->inputs[1]);
+            bool err = false;
+            Value result = value_number(0);
+            const std::string& op = block->type;
+            if(op=="op_add")    result = op_add(a,b_val,err);
+            else if(op=="op_sub")    result = op_sub(a,b_val,err);
+            else if(op=="op_mul")    result = op_mul(a,b_val,err);
+            else if(op=="op_div")    result = op_div(a,b_val,err);
+            else if(op=="op_mod")    result = op_modulo(a,b_val,err);
+            else if(op=="op_gt")     result = op_greater_than(a,b_val,err);
+            else if(op=="op_lt")     result = op_less_than(a,b_val,err);
+            else if(op=="op_eq")     result = op_equals(a,b_val);
+            else if(op=="op_and")    result = op_and(a,b_val);
+            else if(op=="op_or")     result = op_or(a,b_val);
+            else if(op=="op_xor")    result = op_xor(a,b_val);
+            if(!err) std::cout << "  op result: " << result.num << std::endl;
+        } else if(block->inputs.size() >= 1){
+            Value a = value_number(block->inputs[0]);
+            bool err = false;
+            Value result = value_number(0);
+            const std::string& op = block->type;
+            if(op=="op_not")   result = op_not(a);
+            else if(op=="op_abs")   result = op_abs(a);
+            else if(op=="op_floor") result = op_floor(a);
+            else if(op=="op_ceil")  result = op_ceil(a);
+            else if(op=="op_sqrt")  result = op_sqrt(a,err);
+            else if(op=="op_sin")   result = op_sin(a);
+            else if(op=="op_cos")   result = op_cos(a);
+            else if(op=="op_round") result = value_number(std::round(a.num));
+            if(!err) std::cout << "  op result: " << result.num << std::endl;
+        }
     }
     else if(block->type=="when_start"){
         // no-op: فقط شروع اجرا
