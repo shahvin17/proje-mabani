@@ -42,4 +42,3 @@ target_link_libraries(scratch_app
     # ${SDL2_TTF_LIBRARIES}
     # ${SDL2_MIXER_LIBRARIES}
 )
-target_link_libraries(scratch_app -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer)
