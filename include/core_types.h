@@ -33,16 +33,24 @@ struct Sprite {
     float  say_timer    = 0.0f;
     float  size_percent = 100.0f;
 
-    // --- Costume (تصویر) ---
-    string costume_path = "";   // مسیر فایل PNG مثلاً assets/photos/sprite1.png
+    // --- Costume ---
+    string costume_path = "";
 
     PenState pen_state;
 };
 
+struct Variable {
+    string name;
+    float  value = 0.0f;
+    bool   visible = true;
+};
+
 struct Project {
-    vector<Sprite> sprites;
-    vector<Block>  blocks;
+    vector<Sprite>   sprites;
+    vector<Block>    blocks;
+    vector<Variable> variables;   // ← متغیرهای پروژه
     bool isModified = false;
+    PenCanvas pen_canvas;
 };
 
 #endif

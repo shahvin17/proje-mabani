@@ -23,19 +23,20 @@
 #include "persist.h"
 #include "logger.h"
 #include <cctype>   // برای std::isdigit
+#include "pen.h"
 
 // ─── ثابت‌های ابعاد UI ───────────────────────────────────────────────────────
 // ابعاد پنجره — در main() بعد از fullscreen آپدیت می‌شوند
 static int WINDOW_W      = 1280;
 static int WINDOW_H      = 720;
 static const int TOOLBAR_H     = 50;
-static const int SIDEBAR_W     = 220;  // پانل دسته‌بندی + پالت
-static const int CATEGORY_W    = 60;   // ستون آیکون دسته‌بندی
+static const int SIDEBAR_W     = 270;  // پانل دسته‌بندی + پالت
+static const int CATEGORY_W    = 98;   // ستون دسته‌بندی (عریض برای نام کامل)
 static const int PALETTE_W     = SIDEBAR_W - CATEGORY_W;
 static const int STAGE_W         = 320;
 static const int STAGE_H         = 240;
 static const int BLOCK_H         = 44;
-static const int BLOCK_W         = 150;
+static const int BLOCK_W         = 170;   // عریض‌تر برای input fields
 static const int SPRITE_PANEL_H  = 110;  // ارتفاع پانل sprite در زیر stage
 static const int SPRITE_THUMB_W  = 70;
 static const int SPRITE_THUMB_H  = 70;
@@ -51,10 +52,11 @@ static const std::vector<CategoryInfo> CATEGORIES = {
     {"Looks",     {153, 102, 204, 255}},
     {"Sound",     {207,  99, 207, 255}},
     {"Events",    {255, 171,  25, 255}},
-    {"Control",   {255, 171,  25, 255}},  // نارنجی‌تر
+    {"Control",   {255, 140,   0, 255}},
     {"Sensing",   {92,  196, 220, 255}},
     {"Operators", {89,  192,  89, 255}},
     {"Variables", {255, 140,  26, 255}},
+    {"Pen",       {0,   200, 100, 255}},  // سبز پررنگ مثل Scratch
 };
 
 // ─── اطلاعات یک بلوک قالب در پالت ───────────────────────────────────────────
@@ -97,6 +99,7 @@ static const std::vector<PaletteEntry> PALETTE_ENTRIES = {
     {"if_block",        "if <> then",             {},      "Control"},
     {"if_else",         "if <> else",             {},      "Control"},
     {"stop_all",        "stop all",               {},      "Control"},
+    {"end_repeat",      "end repeat ←",           {},      "Control"},
     // Sensing
     {"touching_mouse",  "touching mouse?",        {},      "Sensing"},
     {"key_pressed",     "key space pressed?",     {},      "Sensing"},
@@ -129,6 +132,21 @@ static const std::vector<PaletteEntry> PALETTE_ENTRIES = {
     {"set_var",         "set var to 0",           {0},     "Variables"},
     {"change_var",      "change var by 1",        {1},     "Variables"},
     {"show_var",        "show variable var",      {},      "Variables"},
+    // Pen (Add Extension)
+    {"pen_erase_all",   "erase all",              {},      "Pen"},
+    {"pen_stamp",       "stamp",                  {},      "Pen"},
+    {"pen_down",        "pen down",               {},      "Pen"},
+    {"pen_up",          "pen up",                 {},      "Pen"},
+    {"pen_set_color",   "set pen color",          {0,0,255},"Pen"},
+    {"pen_change_color","change pen color by",    {10},    "Pen"},
+    {"pen_set_size",    "set pen size to",        {1},     "Pen"},
+    {"pen_change_size", "change pen size by",     {1},     "Pen"},
+    {"pen_set_hue",     "set pen hue to",         {100},   "Pen"},
+    {"pen_change_hue",  "change pen hue by",      {10},    "Pen"},
+    {"pen_set_brightness","set pen brightness to",{100},   "Pen"},
+    {"pen_change_brightness","change pen brightness by",{10},"Pen"},
+    {"pen_set_saturation","set pen saturation to",{100},   "Pen"},
+    {"pen_change_saturation","change pen saturation by",{10},"Pen"},
 };
 
 // ─── رنگ بلوک بر اساس دسته‌بندی ──────────────────────────────────────────────
@@ -175,6 +193,7 @@ std::string labelNoNumbers(const std::string& type) {
         {"when_key",     "when space pressed"},
         {"when_clicked", "when sprite clicked"},
         {"forever",      "forever"},
+        {"end_repeat",   "end repeat ←"},
         {"if_block",     "if <> then"},
         {"if_else",      "if <> else"},
         {"stop_all",     "stop all"},
@@ -203,6 +222,21 @@ std::string labelNoNumbers(const std::string& type) {
         {"op_round",     "round ( )"},
         {"op_xor",       "( ) xor ( )"},
         {"op_random",    "random ( ) to ( )"},
+        // Pen
+        {"pen_erase_all",    "erase all"},
+        {"pen_stamp",        "stamp"},
+        {"pen_down",         "pen down"},
+        {"pen_up",           "pen up"},
+        {"pen_set_color",    "set pen color"},
+        {"pen_change_color", "change pen color by"},
+        {"pen_set_size",     "set pen size to"},
+        {"pen_change_size",  "change pen size by"},
+        {"pen_set_hue",      "set pen hue to"},
+        {"pen_change_hue",   "change pen hue by"},
+        {"pen_set_brightness","set pen brightness to"},
+        {"pen_change_brightness","change pen brightness by"},
+        {"pen_set_saturation","set pen saturation to"},
+        {"pen_change_saturation","change pen saturation by"},
     };
     auto it = clean.find(type);
     if (it != clean.end()) return it->second;
@@ -324,8 +358,15 @@ struct UIState {
     std::string input_buffer = "";
 
     // sprite panel
-    int    active_sprite_id  = 1;    // id sprite انتخاب‌شده فعلی
+    int    active_sprite_id  = 1;
     bool   show_sprite_panel = true;
+
+    // Variables dialog
+    bool   show_var_dialog   = false;
+    std::string new_var_name = "";
+
+    // Pause button
+    bool   step_mode         = false;
 };
 
 // ─── پیدا کردن بلوک با id ─────────────────────────────────────────────────────
@@ -520,7 +561,8 @@ int main(int argc, char* argv[]) {
     // وسط: Run / Stop / Step
     SDL_Rect btn_run  = {WINDOW_W/2 - 60, 8, 52, 34};
     SDL_Rect btn_stop = {WINDOW_W/2 - 4,  8, 52, 34};
-    SDL_Rect btn_step = {WINDOW_W/2 + 52, 8, 52, 34};
+    SDL_Rect btn_step  = {WINDOW_W/2 + 52, 8, 52, 34};
+    SDL_Rect btn_pause = {WINDOW_W/2 + 108, 8, 60, 34};
     // راست: New / Save / Load
     SDL_Rect btn_new  = {WINDOW_W - 195, 8, 55, 34};
     SDL_Rect btn_save = {WINDOW_W - 135, 8, 60, 34};
@@ -557,6 +599,15 @@ int main(int argc, char* argv[]) {
                 else if (SDL_PointInRect(&mp, &btn_stop)) {
                     runtime_stop(&rt);
                     logInfo("Runtime stopped by user.");
+                }
+                else if (SDL_PointInRect(&mp, &btn_pause)) {
+                    if (runtime_isRunning(&rt)) {
+                        runtime_pause(&rt);
+                        logInfo("Runtime paused.");
+                    } else if (runtime_isPaused(&rt)) {
+                        runtime_resume(&rt);
+                        logInfo("Runtime resumed.");
+                    }
                 }
                 else if (SDL_PointInRect(&mp, &btn_save)) {
                     saveProjectAndMark(project, "project.fop");
@@ -639,8 +690,38 @@ int main(int argc, char* argv[]) {
                     int rel_y = my - area_category.y;
                     int cat_h = area_category.h / (int)CATEGORIES.size();
                     int idx = rel_y / cat_h;
-                    if (idx >= 0 && idx < (int)CATEGORIES.size())
+                    if (idx >= 0 && idx < (int)CATEGORIES.size()) {
                         ui.active_category = CATEGORIES[idx].name;
+                    }
+                }
+                // --- Variable dialog click ---
+                else if (ui.show_var_dialog) {
+                    int dlg_w=300, dlg_h=120;
+                    int dlg_x=WINDOW_W/2-dlg_w/2, dlg_y=WINDOW_H/2-dlg_h/2;
+                    SDL_Rect ok_btn     = {dlg_x+60,  dlg_y+80, 70, 26};
+                    SDL_Rect cancel_btn = {dlg_x+140, dlg_y+80, 70, 26};
+                    if (SDL_PointInRect(&mp, &ok_btn) && !ui.new_var_name.empty()) {
+                        // چک تکراری نبودن
+                        bool dup = false;
+                        for (auto& v : project.variables)
+                            if (v.name == ui.new_var_name) { dup=true; break; }
+                        if (!dup) {
+                            Variable var;
+                            var.name    = ui.new_var_name;
+                            var.value   = 0;
+                            var.visible = true;
+                            project.variables.push_back(var);
+                            logInfo("Variable created: " + ui.new_var_name);
+                        }
+                        ui.show_var_dialog = false;
+                        ui.new_var_name    = "";
+                        SDL_StopTextInput();
+                    }
+                    else if (SDL_PointInRect(&mp, &cancel_btn)) {
+                        ui.show_var_dialog = false;
+                        ui.new_var_name    = "";
+                        SDL_StopTextInput();
+                    }
                 }
 
                 // --- کلیک روی پالت: ساخت بلوک جدید ---
@@ -662,8 +743,16 @@ int main(int argc, char* argv[]) {
                         nb.nextBlockId = -1;
                         nb.x       = (float)(mx - BLOCK_W/2);
                         nb.y       = (float)(my - BLOCK_H/2);
-                        nb.width   = BLOCK_W;
-                        nb.height  = BLOCK_H;
+                        // عرض بلوک: label + inputs + padding
+                        {
+                            std::string lbl = nb.inputs.empty()
+                                ? labelForBlockType(nb.type)
+                                : labelNoNumbers(nb.type);
+                            int lbl_px  = (int)lbl.size() * 8 + 16; // ~8px/char + padding
+                            int inp_px  = (int)nb.inputs.size() * 46; // 42px + 4 gap
+                            nb.width  = std::max(BLOCK_W, lbl_px + inp_px);
+                            nb.height = BLOCK_H;
+                        }
                         project.blocks.push_back(nb);
                         ui.dragging_block = &project.blocks.back();
                         ui.drag_offset_x  = BLOCK_W/2;
@@ -771,6 +860,26 @@ int main(int argc, char* argv[]) {
 
             // ── Keyboard ──
             if (event.type == SDL_KEYDOWN) {
+                int k2 = event.key.keysym.sym;
+                // ── Variable Dialog Keyboard ──
+                if (ui.show_var_dialog) {
+                    if (k2 == SDLK_RETURN || k2 == SDLK_KP_ENTER) {
+                        if (!ui.new_var_name.empty()) {
+                            bool dup = false;
+                            for (auto& v : project.variables)
+                                if (v.name == ui.new_var_name) { dup=true; break; }
+                            if (!dup) {
+                                Variable nv; nv.name=ui.new_var_name; nv.value=0; nv.visible=true;
+                                project.variables.push_back(nv);
+                            }
+                        }
+                        ui.show_var_dialog = false; ui.new_var_name = ""; SDL_StopTextInput();
+                    } else if (k2 == SDLK_ESCAPE) {
+                        ui.show_var_dialog = false; ui.new_var_name = ""; SDL_StopTextInput();
+                    } else if (k2 == SDLK_BACKSPACE && !ui.new_var_name.empty()) {
+                        ui.new_var_name.pop_back();
+                    }
+                }
                 // اگر در حال ویرایش input هستیم
                 if (ui.editing_block_id != -1) {
                     if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER) {
@@ -815,13 +924,20 @@ int main(int argc, char* argv[]) {
                 }
             }
             // ── Text Input (حروف و اعداد وارد شده) ──
-            if (event.type == SDL_TEXTINPUT && ui.editing_block_id != -1) {
+            if (event.type == SDL_TEXTINPUT) {
+                if (ui.show_var_dialog) {
+                    for (char c : std::string(event.text.text))
+                        if (std::isalnum((unsigned char)c) || c=='_')
+                            ui.new_var_name += c;
+                }
+                if (ui.editing_block_id != -1) {
                 // فقط ارقام و نقطه اعشار
                 std::string incoming = event.text.text;
                 for (char c : incoming) {
                     if (std::isdigit(c) || (c == '.' && ui.input_buffer.find('.') == std::string::npos))
                         ui.input_buffer += c;
                 }
+                } // end editing_block
             }
         }
 
@@ -866,8 +982,18 @@ int main(int argc, char* argv[]) {
         {
             fillRect(renderer, btn_step.x, btn_step.y, btn_step.w, btn_step.h, {50,100,200,255});
             drawRect(renderer, btn_step.x, btn_step.y, btn_step.w, btn_step.h, {30,70,150,255});
-            if (font_normal) renderText(renderer, font_normal, "▶| Step",
+            if (font_normal) renderText(renderer, font_normal, "▶|Step",
                 btn_step.x+4, btn_step.y+9, {255,255,255,255});
+        }
+        // دکمه Pause/Resume (زرد)
+        {
+            bool is_paused = runtime_isPaused(&rt);
+            SDL_Color pc = is_paused ? SDL_Color{200,160,0,255} : SDL_Color{160,130,0,255};
+            fillRect(renderer, btn_pause.x, btn_pause.y, btn_pause.w, btn_pause.h, pc);
+            drawRect(renderer, btn_pause.x, btn_pause.y, btn_pause.w, btn_pause.h, {100,80,0,255});
+            std::string plbl = is_paused ? "▶ Resume" : "⏸ Pause";
+            if (font_small) renderText(renderer, font_small, plbl,
+                btn_pause.x+5, btn_pause.y+11, {255,255,255,255});
         }
         // New / Save / Load (سمت راست toolbar)
         {
@@ -902,10 +1028,10 @@ int main(int argc, char* argv[]) {
             fillRect(renderer, area_category.x, cy, area_category.w, cat_h-1, bg);
 
             // متن (اول حرف)
+            // اسم کامل category
             if (font_small) {
-                std::string short_name = cat.name.substr(0, 2);
-                renderText(renderer, font_small, short_name,
-                    area_category.x + 4, cy + cat_h/2 - 7,
+                renderText(renderer, font_small, cat.name,
+                    area_category.x + 5, cy + cat_h/2 - 6,
                     active ? SDL_Color{255,255,255,255} : cat.color);
             }
             // نقطه رنگی
@@ -930,6 +1056,30 @@ int main(int argc, char* argv[]) {
                 if (e.category == ui.active_category) visible.push_back(&e);
 
             int py = area_palette.y + 36;
+
+            // دکمه "Make a Variable" در بالای Variables palette
+            if (ui.active_category == "Variables") {
+                SDL_Rect mkvar_btn = {area_palette.x+6, py, PALETTE_W-12, 28};
+                fillRect(renderer, mkvar_btn.x, mkvar_btn.y, mkvar_btn.w, mkvar_btn.h,
+                    {255,140,26,255});
+                drawRect(renderer, mkvar_btn.x, mkvar_btn.y, mkvar_btn.w, mkvar_btn.h,
+                    {180,100,0,255});
+                if (font_small) renderText(renderer, font_small, "Make a Variable",
+                    mkvar_btn.x+8, mkvar_btn.y+7, {255,255,255,255});
+                py += 36;
+                // نمایش متغیرهای موجود
+                for (auto& var : project.variables) {
+                    std::string vline = var.name + " = " + std::to_string((int)var.value);
+                    fillRect(renderer, area_palette.x+6, py, PALETTE_W-12, 22,
+                        {200,120,20,200});
+                    if (font_small) renderText(renderer, font_small, vline,
+                        area_palette.x+10, py+4, {255,255,255,255});
+                    py += 26;
+                    if (py > area_palette.y + area_palette.h - 30) break;
+                }
+                py += 8;
+            }
+
             for (auto* pe : visible) {
                 SDL_Color col = colorForCategory(pe->category);
                 renderBlock(renderer, area_palette.x+6, py, PALETTE_W-12, BLOCK_H-4, col);
@@ -983,32 +1133,50 @@ int main(int argc, char* argv[]) {
             renderBlock(renderer, (int)b.x, (int)b.y, (int)b.width, (int)b.height,
                         col, highlighted);
 
-            // رندر label بدون عدد (اعداد در input field نشان داده می‌شوند)
+            // رندر label — محدود به فضای قبل از input fields
             if (font_small) {
                 std::string lbl = b.inputs.empty()
                     ? labelForBlockType(b.type)
                     : labelNoNumbers(b.type);
+
+                // فضای label = عرض بلوک - فضای inputs - padding
+                {
+                    int n_inputs     = (int)b.inputs.size();
+                    int fields_px    = n_inputs * (36 + 4 + 2); // FIELD_W+GAP+margin
+                    int label_max_px = (int)b.width - fields_px - 18;
+                    label_max_px = std::max(label_max_px, 12);
+                    int max_chars = label_max_px / 8; // ~8px per char
+                    if (max_chars > 0 && (int)lbl.size() > max_chars)
+                        lbl = lbl.substr(0, std::max(max_chars, 1));
+                }
+
                 renderText(renderer, font_small, lbl,
-                    (int)b.x+8, (int)b.y + (int)b.height/2 - 7, {255,255,255,255});
+                    (int)b.x + 8,
+                    (int)b.y + (int)b.height/2 - 7,
+                    {255,255,255,255});
             }
 
-            // رندر input fields
+            // رندر input fields (از راست بلوک)
             {
                 int input_count = (int)b.inputs.size();
+                const int FIELD_W = 36;
+                const int FIELD_H = 22;
+                const int FIELD_GAP = 4;
+                // کل فضای inputs از راست
+                int total_fields_w = input_count * (FIELD_W + FIELD_GAP);
                 for (int k = 0; k < input_count && k < 3; ++k) {
-                    int field_x = (int)b.x + (int)b.width - (input_count - k) * 42 - 4;
-                    int field_y = (int)b.y + ((int)b.height - 22) / 2;
+                    int field_x = (int)b.x + (int)b.width - total_fields_w + k*(FIELD_W+FIELD_GAP);
+                    int field_y = (int)b.y + ((int)b.height - FIELD_H) / 2;
 
                     bool is_editing = (ui.editing_block_id == b.id && ui.editing_input_idx == k);
 
                     // پس‌زمینه field
                     SDL_Color field_bg = is_editing ? SDL_Color{255,255,200,255}
                                                     : SDL_Color{255,255,255,180};
-                    fillRect(renderer, field_x, field_y, 38, 22, field_bg);
-                    // کادر
+                    fillRect(renderer, field_x, field_y, FIELD_W, FIELD_H, field_bg);
                     SDL_Color border_col = is_editing ? SDL_Color{255,120,0,255}
                                                       : SDL_Color{100,100,100,180};
-                    drawRect(renderer, field_x, field_y, 38, 22, border_col);
+                    drawRect(renderer, field_x, field_y, FIELD_W, FIELD_H, border_col);
 
                     // مقدار
                     std::string val_str = is_editing ? ui.input_buffer
@@ -1064,6 +1232,45 @@ int main(int argc, char* argv[]) {
             fillRect(renderer, stage_x, stage_y, stage_draw_w, stage_draw_h, {255,255,255,255});
         }
         drawRect(renderer, stage_x, stage_y, stage_draw_w, stage_draw_h, {100,100,100,255});
+
+        // ── رندر Pen Canvas (خطوط و stampها) ──────────────────────────────
+        // تبدیل مختصات Scratch → pixel stage
+        auto scratch_to_px = [&](float sx, float sy, int& px, int& py) {
+            px = stage_x + stage_draw_w/2 + (int)(sx * stage_draw_w / 480.0f);
+            py = stage_y + stage_draw_h/2 - (int)(sy * stage_draw_h / 360.0f);
+        };
+
+        // خطوط
+        for (auto& stroke : project.pen_canvas.strokes) {
+            int x1,y1,x2,y2;
+            scratch_to_px(stroke.x1, stroke.y1, x1, y1);
+            scratch_to_px(stroke.x2, stroke.y2, x2, y2);
+            // رسم چند خط برای ضخامت
+            int thickness = std::max(1, (int)stroke.size);
+            SDL_SetRenderDrawColor(renderer, stroke.r, stroke.g, stroke.b, 255);
+            for (int t = -thickness/2; t <= thickness/2; ++t) {
+                SDL_RenderDrawLine(renderer, x1+t, y1,   x2+t, y2);
+                SDL_RenderDrawLine(renderer, x1,   y1+t, x2,   y2+t);
+            }
+        }
+
+        // stampها
+        for (auto& st : project.pen_canvas.stamps) {
+            int px, py;
+            scratch_to_px(st.world_x, st.world_y, px, py);
+            int sw2 = (int)(st.width  * st.size_percent / 100.0f);
+            int sh2 = (int)(st.height * st.size_percent / 100.0f);
+            sw2 = std::max(sw2, 8); sh2 = std::max(sh2, 8);
+            SDL_Texture* st_tex = st.costume_path.empty()
+                ? nullptr : loadTexture(st.costume_path);
+            if (st_tex) {
+                SDL_Rect dst = {px-sw2/2, py-sh2/2, sw2, sh2};
+                SDL_RenderCopy(renderer, st_tex, nullptr, &dst);
+            } else {
+                fillRect(renderer, px-sw2/2, py-sh2/2, sw2, sh2,
+                    {(Uint8)st.r, (Uint8)st.g, (Uint8)st.b, 180});
+            }
+        }
 
         // رندر spriteها
         // مختصات Scratch: x=0,y=0 مرکز stage. x از -240 تا +240، y از -180 تا +180
@@ -1141,6 +1348,46 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // ── Variable Dialog ──────────────────────────────────────────────────
+        if (ui.show_var_dialog) {
+            int dlg_w = 300, dlg_h = 120;
+            int dlg_x = WINDOW_W/2 - dlg_w/2;
+            int dlg_y = WINDOW_H/2 - dlg_h/2;
+            fillRect(renderer, dlg_x, dlg_y, dlg_w, dlg_h, {50,50,60,240});
+            drawRect(renderer, dlg_x, dlg_y, dlg_w, dlg_h, {100,100,120,255});
+            if (font_bold)  renderText(renderer, font_bold,  "New Variable",
+                dlg_x+10, dlg_y+10, {255,255,255,255});
+            if (font_small) renderText(renderer, font_small, "Name:",
+                dlg_x+10, dlg_y+40, {200,200,200,255});
+            // input box
+            fillRect(renderer, dlg_x+60, dlg_y+36, 180, 24, {255,255,255,255});
+            if (font_small) renderText(renderer, font_small, ui.new_var_name,
+                dlg_x+64, dlg_y+40, {0,0,0,255});
+            // OK / Cancel
+            fillRect(renderer, dlg_x+60,  dlg_y+80, 70, 26, {60,160,60,255});
+            fillRect(renderer, dlg_x+140, dlg_y+80, 70, 26, {160,60,60,255});
+            if (font_small) renderText(renderer, font_small, "OK",
+                dlg_x+85,  dlg_y+85, {255,255,255,255});
+            if (font_small) renderText(renderer, font_small, "Cancel",
+                dlg_x+148, dlg_y+85, {255,255,255,255});
+        }
+
+        // ── نمایش متغیرها روی stage ──────────────────────────────────────────
+        {
+            int vx = area_stage.x + 4;
+            int vy = area_stage.y + 4;
+            for (auto& var : project.variables) {
+                if (!var.visible) continue;
+                std::string vstr = var.name + ": " + std::to_string((int)var.value);
+                // پس‌زمینه نمایش
+                fillRect(renderer, vx, vy, 110, 20, {220,220,255,200});
+                drawRect(renderer, vx, vy, 110, 20, {100,100,150,255});
+                if (font_small)
+                    renderText(renderer, font_small, vstr, vx+4, vy+3, {0,0,80,255});
+                vy += 24;
+            }
+        }
+
         // ── Sprite Panel زیر stage ──────────────────────────────────────────
         {
             int panel_y = WINDOW_H - SPRITE_PANEL_H;
@@ -1210,6 +1457,42 @@ int main(int argc, char* argv[]) {
                     "  y:" + std::to_string((int)active_spr->y) +
                     "  dir:" + std::to_string((int)active_spr->direction);
                 renderText(renderer, font_small, info, info_x, info_y2, {180,180,180,255});
+
+                // وضعیت قلم
+                {
+                    auto& ps = active_spr->pen_state;
+                    std::string pen_str = std::string(ps.is_down ? "PEN DOWN" : "pen up") +
+                        "  sz:" + std::to_string((int)ps.size);
+                    SDL_Color pen_col = ps.is_down
+                        ? SDL_Color{(Uint8)ps.r,(Uint8)ps.g,(Uint8)ps.b,255}
+                        : SDL_Color{100,100,100,255};
+                    renderText(renderer, font_small, pen_str,
+                        info_x, info_y2 + 14, pen_col);
+                    if (ps.is_down) {
+                        fillRect(renderer, info_x+95, info_y2+12, 14, 14,
+                            {(Uint8)ps.r,(Uint8)ps.g,(Uint8)ps.b,255});
+                        drawRect(renderer, info_x+95, info_y2+12, 14, 14,
+                            {200,200,200,255});
+                    }
+                }
+                // وضعیت قلم
+                auto& ps = active_spr->pen_state;
+                std::string pen_str = std::string("Pen: ") +
+                    (ps.is_down ? "DOWN" : "up") +
+                    "  size:" + std::to_string((int)ps.size);
+                SDL_Color pen_col = ps.is_down
+                    ? SDL_Color{(Uint8)ps.r,(Uint8)ps.g,(Uint8)ps.b,255}
+                    : SDL_Color{100,100,100,255};
+                renderText(renderer, font_small, pen_str,
+                    info_x, info_y2 + 14, pen_col);
+
+                // نقطه رنگ قلم
+                if (ps.is_down) {
+                    fillRect(renderer, info_x+90, info_y2+12, 14, 14,
+                        {(Uint8)ps.r,(Uint8)ps.g,(Uint8)ps.b,255});
+                    drawRect(renderer, info_x+90, info_y2+12, 14, 14,
+                        {200,200,200,255});
+                }
 
                 // دکمه‌های show/hide و delete برای sprite فعال
                 // Hide/Show
