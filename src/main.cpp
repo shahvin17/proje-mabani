@@ -24,6 +24,7 @@
 #include "logger.h"
 #include <cctype>   // برای std::isdigit
 #include "pen.h"
+#include "sensing.h"
 
 // ─── ثابت‌های ابعاد UI ───────────────────────────────────────────────────────
 // ابعاد پنجره — در main() بعد از fullscreen آپدیت می‌شوند
@@ -37,7 +38,7 @@ static const int STAGE_W         = 320;
 static const int STAGE_H         = 240;
 static const int BLOCK_H         = 44;
 static const int BLOCK_W         = 170;   // عریض‌تر برای input fields
-static const int SPRITE_PANEL_H  = 110;  // ارتفاع پانل sprite در زیر stage
+static const int SPRITE_PANEL_H  = 135;  // ارتفاع پانل sprite در زیر stage
 static const int SPRITE_THUMB_W  = 70;
 static const int SPRITE_THUMB_H  = 70;
 
@@ -56,7 +57,20 @@ static const std::vector<CategoryInfo> CATEGORIES = {
     {"Sensing",   {92,  196, 220, 255}},
     {"Operators", {89,  192,  89, 255}},
     {"Variables", {255, 140,  26, 255}},
-    {"Pen",       {0,   200, 100, 255}},  // سبز پررنگ مثل Scratch
+    {"Pen",       {0,   200, 100, 255}},
+};
+
+// Extensions available
+struct ExtensionInfo {
+    std::string id, name, description;
+    SDL_Color color;
+    bool enabled;
+};
+static std::vector<ExtensionInfo> EXTENSIONS = {
+    {"pen",     "Pen",         "Draw on stage",         {0,200,100,255},  true},
+    {"video",   "Video",       "Video sensing",         {90,90,200,255},  false},
+    {"tts",     "Text to Speech","Say blocks aloud",    {200,100,180,255},false},
+    {"micro",   "Microphone",  "Sound input",           {200,60,60,255},  false},
 };
 
 // ─── اطلاعات یک بلوک قالب در پالت ───────────────────────────────────────────
@@ -85,6 +99,12 @@ static const std::vector<PaletteEntry> PALETTE_ENTRIES = {
     {"hide",            "hide",                   {},      "Looks"},
     {"set_size",        "set size to 100%",       {100},   "Looks"},
     {"change_size",     "change size by 10",      {10},    "Looks"},
+    {"next_backdrop",   "next backdrop",           {},      "Looks"},
+    {"prev_backdrop",   "prev backdrop",           {},      "Looks"},
+    {"set_backdrop",    "switch backdrop to",      {0},     "Looks"},
+    {"next_costume",    "next costume",            {},      "Looks"},
+    {"prev_costume",    "prev costume",            {},      "Looks"},
+    {"set_costume",     "switch costume to",       {0},     "Looks"},
     // Sound
     {"play_sound",      "play sound",             {},      "Sound"},
     {"stop_sounds",     "stop all sounds",        {},      "Sound"},
@@ -96,8 +116,8 @@ static const std::vector<PaletteEntry> PALETTE_ENTRIES = {
     {"wait",            "wait 1 secs",            {1},     "Control"},
     {"repeat",          "repeat 10",              {10},    "Control"},
     {"forever",         "forever",                {},      "Control"},
-    {"if_block",        "if <> then",             {},      "Control"},
-    {"if_else",         "if <> else",             {},      "Control"},
+    {"if_then",         "if <condition> then",    {},      "Control"},
+    {"if_else",         "if <cond> else",          {},      "Control"},
     {"stop_all",        "stop all",               {},      "Control"},
     {"end_repeat",      "end repeat ←",           {},      "Control"},
     // Sensing
@@ -106,6 +126,9 @@ static const std::vector<PaletteEntry> PALETTE_ENTRIES = {
     {"mouse_down",      "mouse down?",            {},      "Sensing"},
     {"mouse_x",         "mouse x",                {},      "Sensing"},
     {"mouse_y",         "mouse y",                {},      "Sensing"},
+    {"distance_to_mouse","distance to mouse",     {},      "Sensing"},
+    {"reset_timer",     "reset timer",            {},      "Sensing"},
+    {"set_drag_mode",   "set drag mode",          {1},     "Sensing"},
     // Operators — 13 اجباری + 8 جبرانی
     {"op_add",          "( ) + ( )",              {0,0},   "Operators"},
     {"op_sub",          "( ) - ( )",              {0,0},   "Operators"},
@@ -187,6 +210,12 @@ std::string labelNoNumbers(const std::string& type) {
         {"hide",         "hide"},
         {"set_size",     "set size to"},
         {"change_size",  "change size by"},
+        {"next_backdrop", "next backdrop"},
+        {"prev_backdrop", "prev backdrop"},
+        {"set_backdrop",  "switch backdrop to"},
+        {"next_costume",  "next costume"},
+        {"prev_costume",  "prev costume"},
+        {"set_costume",   "switch costume to"},
         {"wait",         "wait"},
         {"repeat",       "repeat"},
         {"when_start",   "when ð© clicked"},
@@ -194,7 +223,8 @@ std::string labelNoNumbers(const std::string& type) {
         {"when_clicked", "when sprite clicked"},
         {"forever",      "forever"},
         {"end_repeat",   "end repeat ←"},
-        {"if_block",     "if <> then"},
+        {"if_then",      "if <condition> then"},
+        {"if_else",      "if <cond> else"},
         {"if_else",      "if <> else"},
         {"stop_all",     "stop all"},
         {"set_var",      "set var to"},
@@ -366,7 +396,11 @@ struct UIState {
     std::string new_var_name = "";
 
     // Pause button
-    bool   step_mode         = false;
+    bool   step_mode              = false;
+    // Extensions panel
+    bool   show_extensions_panel  = false;
+    // Costume/Backdrop dialog
+    bool   show_costume_panel     = false;
 };
 
 // ─── پیدا کردن بلوک با id ─────────────────────────────────────────────────────
@@ -491,8 +525,10 @@ int main(int argc, char* argv[]) {
 
     // ── پروژه و Runtime ──
     Project project;
+    SensingManager sensing;
     Runtime rt;
     runtime_init(&rt, &project);
+    rt.sensing = &sensing;
 
     int next_block_id = 100;
 
@@ -510,7 +546,25 @@ int main(int argc, char* argv[]) {
         spr.width        = 48.0f;
         spr.height       = 48.0f;
         spr.size_percent = 100.0f;
+        // costume پیش‌فرض
+        {
+            Costume c; c.name = "costume1";
+            c.path = g_assets_path + "sprite1.png";
+            spr.costumes.push_back(c);
+            spr.costume_index = 0;
+            spr.costume_path  = c.path;
+        }
         project.sprites.push_back(spr);
+
+        // backdrop پیش‌فرض
+        project.backdrops.clear();
+        {
+            Backdrop bd; bd.name = "backdrop1";
+            bd.path = g_assets_path + "background.png";
+            project.backdrops.push_back(bd);
+        }
+        project.active_backdrop_idx = 0;
+
         // بلوک when_start پیش‌فرض
         Block b;
         b.id          = next_block_id++;
@@ -687,11 +741,44 @@ int main(int argc, char* argv[]) {
 
                 // --- کلیک روی دسته‌بندی ---
                 else if (SDL_PointInRect(&mp, &area_category)) {
-                    int rel_y = my - area_category.y;
-                    int cat_h = area_category.h / (int)CATEGORIES.size();
-                    int idx = rel_y / cat_h;
-                    if (idx >= 0 && idx < (int)CATEGORIES.size()) {
-                        ui.active_category = CATEGORIES[idx].name;
+                    const int EXT_BTN_H2 = 32;
+                    int btn_y = area_category.y + area_category.h - EXT_BTN_H2 - 2;
+                    SDL_Rect ext_btn = {area_category.x+2, btn_y, CATEGORY_W-4, EXT_BTN_H2};
+                    if (SDL_PointInRect(&mp, &ext_btn)) {
+                        ui.show_extensions_panel = !ui.show_extensions_panel;
+                    } else {
+                        int cat_h2 = (area_category.h - EXT_BTN_H2 - 4) / (int)CATEGORIES.size();
+                        cat_h2 = std::max(28, cat_h2);
+                        int rel_y = my - area_category.y;
+                        int idx2 = rel_y / cat_h2;
+                        if (idx2 >= 0 && idx2 < (int)CATEGORIES.size())
+                            ui.active_category = CATEGORIES[idx2].name;
+                    }
+                }
+                // ── بستن Extensions Panel با کلیک X ──
+                else if (ui.show_extensions_panel) {
+                    int ep_w=340, ep_h=320;
+                    int ep_x=WINDOW_W/2-ep_w/2, ep_y=WINDOW_H/2-ep_h/2;
+                    SDL_Rect close_btn={ep_x+ep_w-30,ep_y+6,24,24};
+                    if (SDL_PointInRect(&mp, &close_btn)) {
+                        ui.show_extensions_panel = false;
+                    } else {
+                        // کلیک روی هر extension برای toggle
+                        int ex=ep_x+10, ey2=ep_y+44;
+                        for (int ei=0; ei<(int)EXTENSIONS.size(); ++ei) {
+                            SDL_Rect er={ex,ey2,ep_w-20,56};
+                            if (SDL_PointInRect(&mp, &er)) {
+                                EXTENSIONS[ei].enabled = !EXTENSIONS[ei].enabled;
+                                if (EXTENSIONS[ei].enabled) {
+                                    // اضافه کردن category اگه نبود
+                                    bool found=false;
+                                    for (auto& c:CATEGORIES) if(c.name==EXTENSIONS[ei].name){found=true;break;}
+                                    // (CATEGORIES const است - فعلاً فقط Pen قابل toggle)
+                                }
+                                break;
+                            }
+                            ey2 += 62;
+                        }
                     }
                 }
                 // --- Variable dialog click ---
@@ -816,7 +903,7 @@ int main(int argc, char* argv[]) {
             }
 
             // ── Mouse Motion ──
-            if (event.type == SDL_MOUSEMOTION && ui.dragging_block) {
+                    else if (event.type == SDL_MOUSEMOTION && ui.dragging_block) {
                 ui.dragging_block->x = (float)(event.motion.x - ui.drag_offset_x);
                 ui.dragging_block->y = (float)(event.motion.y - ui.drag_offset_y);
                 ui.snap_target_id = findSnapTarget(*ui.dragging_block, project);
@@ -861,6 +948,7 @@ int main(int argc, char* argv[]) {
             // ── Keyboard ──
             if (event.type == SDL_KEYDOWN) {
                 int k2 = event.key.keysym.sym;
+                sense_update_key(sensing, k2, true);
                 // ── Variable Dialog Keyboard ──
                 if (ui.show_var_dialog) {
                     if (k2 == SDLK_RETURN || k2 == SDLK_KP_ENTER) {
@@ -924,7 +1012,10 @@ int main(int argc, char* argv[]) {
                 }
             }
             // ── Text Input (حروف و اعداد وارد شده) ──
-            if (event.type == SDL_TEXTINPUT) {
+            else if (event.type == SDL_KEYUP) {
+                sense_update_key(sensing, (int)event.key.keysym.sym, false);
+            }
+            else if (event.type == SDL_TEXTINPUT) {
                 if (ui.show_var_dialog) {
                     for (char c : std::string(event.text.text))
                         if (std::isalnum((unsigned char)c) || c=='_')
@@ -1017,7 +1108,20 @@ int main(int argc, char* argv[]) {
         fillRect(renderer, area_category.x, area_category.y,
                  area_category.w, area_category.h, {30, 30, 30, 255});
 
-        int cat_h = area_category.h / (int)CATEGORIES.size();
+        // دکمه "Add Extension" در پایین sidebar
+        const int EXT_BTN_H = 32;
+        {
+            int btn_y = area_category.y + area_category.h - EXT_BTN_H - 2;
+            fillRect(renderer, area_category.x+2, btn_y, CATEGORY_W-4, EXT_BTN_H,
+                {40,40,80,220});
+            drawRect(renderer, area_category.x+2, btn_y, CATEGORY_W-4, EXT_BTN_H,
+                {80,80,140,255});
+            if (font_small) renderText(renderer, font_small, "+ Ext",
+                area_category.x+8, btn_y+9, {160,200,255,255});
+        }
+
+        int cat_h = (area_category.h - EXT_BTN_H - 4) / (int)CATEGORIES.size();
+        cat_h = std::max(28, cat_h);
         for (int i = 0; i < (int)CATEGORIES.size(); ++i) {
             const auto& cat = CATEGORIES[i];
             int cy = area_category.y + i * cat_h;
@@ -1224,12 +1328,32 @@ int main(int argc, char* argv[]) {
         int stage_draw_w = STAGE_W - 20;
         // stage با نسبت ۴:۳
         int stage_draw_h = stage_draw_w * 3 / 4;
-        // اگر background تصویر داره نمایش بده، وگرنه سفید
-        if (bg_texture) {
-            SDL_Rect bg_dst = {stage_x, stage_y, stage_draw_w, stage_draw_h};
-            SDL_RenderCopy(renderer, bg_texture, nullptr, &bg_dst);
-        } else {
-            fillRect(renderer, stage_x, stage_y, stage_draw_w, stage_draw_h, {255,255,255,255});
+        // آپدیت sensing با موقعیت ماوس فعلی (هر فریم)
+        {
+            int raw_mx=0, raw_my=0;
+            Uint32 mbtn = SDL_GetMouseState(&raw_mx, &raw_my);
+            float sx = (raw_mx - stage_x - stage_draw_w/2.0f) * 480.0f / stage_draw_w;
+            float sy = -(raw_my - stage_y - stage_draw_h/2.0f) * 360.0f / stage_draw_h;
+            sense_update_mouse(sensing, sx, sy, (mbtn & SDL_BUTTON(1)) != 0);
+        }
+        // رندر backdrop فعال
+        {
+            std::string bd_path = "";
+            if (!project.backdrops.empty()) {
+                int bi = project.active_backdrop_idx;
+                if (bi >= 0 && bi < (int)project.backdrops.size())
+                    bd_path = project.backdrops[bi].path;
+            }
+            // اگر backdrop path خالیه، از bg_texture اصلی استفاده کن
+            SDL_Texture* bd_tex = bg_texture;
+            if (!bd_path.empty())
+                bd_tex = loadTexture(bd_path);
+            if (bd_tex) {
+                SDL_Rect bg_dst = {stage_x, stage_y, stage_draw_w, stage_draw_h};
+                SDL_RenderCopy(renderer, bd_tex, nullptr, &bg_dst);
+            } else {
+                fillRect(renderer, stage_x, stage_y, stage_draw_w, stage_draw_h, {255,255,255,255});
+            }
         }
         drawRect(renderer, stage_x, stage_y, stage_draw_w, stage_draw_h, {100,100,100,255});
 
@@ -1348,6 +1472,48 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // ── Extensions Panel ─────────────────────────────────────────────────
+        if (ui.show_extensions_panel) {
+            int ep_w = 340, ep_h = 320;
+            int ep_x = WINDOW_W/2 - ep_w/2;
+            int ep_y = WINDOW_H/2 - ep_h/2;
+            // پس‌زمینه
+            fillRect(renderer, ep_x, ep_y, ep_w, ep_h, {30,30,40,245});
+            drawRect(renderer, ep_x, ep_y, ep_w, ep_h, {80,80,100,255});
+            if (font_bold) renderText(renderer, font_bold, "Add Extension",
+                ep_x+12, ep_y+10, {255,255,255,255});
+            // دکمه بستن
+            fillRect(renderer, ep_x+ep_w-30, ep_y+6, 24, 24, {160,60,60,255});
+            if (font_small) renderText(renderer, font_small, "X",
+                ep_x+ep_w-22, ep_y+10, {255,255,255,255});
+            // لیست extensions
+            int ex = ep_x+10, ey = ep_y+44;
+            for (int ei = 0; ei < (int)EXTENSIONS.size(); ++ei) {
+                auto& ext = EXTENSIONS[ei];
+                SDL_Color bg = ext.enabled
+                    ? SDL_Color{(Uint8)(ext.color.r/2),(Uint8)(ext.color.g/2),(Uint8)(ext.color.b/2),255}
+                    : SDL_Color{50,50,60,255};
+                fillRect(renderer, ex, ey, ep_w-20, 56, bg);
+                drawRect(renderer, ex, ey, ep_w-20, 56,
+                    ext.enabled ? ext.color : SDL_Color{80,80,90,255});
+                // آیکون رنگی
+                fillRect(renderer, ex+4, ey+8, 40, 40, ext.color);
+                // متن
+                if (font_bold)  renderText(renderer, font_bold,  ext.name,
+                    ex+52, ey+10, {255,255,255,255});
+                if (font_small) renderText(renderer, font_small, ext.description,
+                    ex+52, ey+28, {180,180,180,255});
+                // وضعیت
+                std::string status = ext.enabled ? "Added" : "Add";
+                SDL_Color sc = ext.enabled ? SDL_Color{100,220,100,255}
+                                           : SDL_Color{200,200,200,255};
+                if (font_small) renderText(renderer, font_small, status,
+                    ex+ep_w-60, ey+20, sc);
+                ey += 62;
+                if (ey > ep_y + ep_h - 60) break;
+            }
+        }
+
         // ── Variable Dialog ──────────────────────────────────────────────────
         if (ui.show_var_dialog) {
             int dlg_w = 300, dlg_h = 120;
@@ -1450,29 +1616,37 @@ int main(int argc, char* argv[]) {
                 if (s.id == ui.active_sprite_id) { active_spr = &s; break; }
 
             if (active_spr && font_small) {
-                int info_x = panel_x + 10;
-                int info_y2 = panel_y + SPRITE_THUMB_H + 16;
-                std::string info = active_spr->name +
-                    "  x:" + std::to_string((int)active_spr->x) +
-                    "  y:" + std::to_string((int)active_spr->y) +
-                    "  dir:" + std::to_string((int)active_spr->direction);
-                renderText(renderer, font_small, info, info_x, info_y2, {180,180,180,255});
+                int info_x  = panel_x + 8;
+                int info_y2 = panel_y + SPRITE_THUMB_H + 10;
+                const int LH = 15;  // line height
 
-                // وضعیت قلم
+                // ردیف 1: نام
+                renderText(renderer, font_small, active_spr->name,
+                    info_x, info_y2, {220,220,220,255});
+                // ردیف 2: x, y
+                std::string xy_str =
+                    "x:" + std::to_string((int)active_spr->x) +
+                    "  y:" + std::to_string((int)active_spr->y);
+                renderText(renderer, font_small, xy_str,
+                    info_x, info_y2 + LH, {160,220,160,255});
+                // ردیف 3: dir و size
+                std::string ds_str =
+                    "dir:" + std::to_string((int)active_spr->direction) +
+                    "  sz:" + std::to_string((int)active_spr->size_percent) + "%";
+                renderText(renderer, font_small, ds_str,
+                    info_x, info_y2 + LH*2, {160,160,220,255});
+                // ردیف 4: pen status
                 {
                     auto& ps = active_spr->pen_state;
-                    std::string pen_str = std::string(ps.is_down ? "PEN DOWN" : "pen up") +
-                        "  sz:" + std::to_string((int)ps.size);
+                    std::string pen_str = ps.is_down ? "Pen: DOWN" : "Pen: up";
                     SDL_Color pen_col = ps.is_down
                         ? SDL_Color{(Uint8)ps.r,(Uint8)ps.g,(Uint8)ps.b,255}
-                        : SDL_Color{100,100,100,255};
+                        : SDL_Color{120,120,120,255};
                     renderText(renderer, font_small, pen_str,
-                        info_x, info_y2 + 14, pen_col);
+                        info_x, info_y2 + LH*3, pen_col);
                     if (ps.is_down) {
-                        fillRect(renderer, info_x+95, info_y2+12, 14, 14,
+                        fillRect(renderer, info_x+68, info_y2+LH*3, 12, 12,
                             {(Uint8)ps.r,(Uint8)ps.g,(Uint8)ps.b,255});
-                        drawRect(renderer, info_x+95, info_y2+12, 14, 14,
-                            {200,200,200,255});
                     }
                 }
                 // وضعیت قلم

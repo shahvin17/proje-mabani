@@ -1,4 +1,5 @@
 #ifndef RUNTIME_H
+#include <SDL2/SDL.h>
 #define RUNTIME_H
 #include "core_types.h"
 #include <vector>
@@ -7,16 +8,22 @@ using namespace std;
 enum RuntimeState { RUNTIME_STOPPED, RUNTIME_RUNNING, RUNTIME_PAUSED };
 
 struct ControlFrame {
-    int blockId;
-    int counter;
-    int loop_target;
-    int childHeadId;
-    int after_loop_id = -1;  // بلوک بعد از پایان loop
-    bool is_forever   = false;
+    int    blockId;
+    int    counter;
+    int    loop_target;
+    int    childHeadId;
+    int    after_loop_id = -1;
+    bool   is_forever    = false;
+    bool   is_wait       = false;
+    unsigned int wait_end_ms = 0;   // SDL_GetTicks() target for wait
 };
 
+// forward declare
+struct SensingManager;
+
 struct Runtime {
-    Project* project;
+    Project*        project;
+    SensingManager* sensing  = nullptr;  // برای دسترسی به mouse/keyboard
     int currentBlockId;
     RuntimeState state;
     int watchdogCounter;

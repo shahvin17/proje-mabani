@@ -1,8 +1,10 @@
 #include "runtime.h"
+#include <SDL2/SDL.h>
 #include "vars_ops.h"
 #include "motion.h"
 #include "looks.h"
 #include "pen.h"
+#include "sensing.h"
 #include <iostream>
 #include <cmath>
 
@@ -93,10 +95,89 @@ static void executePrimitive(Runtime* rt, Block* block){
         if(spr->y < -165){ spr->y = -165; spr->direction = -spr->direction; }
     }
 
+    // ── Sensing ──
+    else if(block->type == "touching_mouse" && spr && rt->sensing){
+        // نتیجه به عنوان condition در if استفاده می‌شه
+        // برای الان فقط log می‌کنیم
+        bool t = sense_touching_mouse(*spr, *rt->sensing);
+        std::cout << "  touching_mouse: " << (t?"yes":"no") << std::endl;
+    }
+    else if(block->type == "key_pressed"){
+        // inputs[0] = key code (SDLK_...)
+        if(rt->sensing && !block->inputs.empty()){
+            bool p = sense_is_key_pressed(*rt->sensing, block->inputs[0]);
+            std::cout << "  key_pressed: " << (p?"yes":"no") << std::endl;
+        }
+    }
+    else if(block->type == "mouse_down"){
+        if(rt->sensing){
+            bool d = sense_is_mouse_down(*rt->sensing);
+            std::cout << "  mouse_down: " << (d?"yes":"no") << std::endl;
+        }
+    }
+    else if(block->type == "mouse_x" && spr && rt->sensing){
+        // sprite رو به مختصات ماوس ببر (اگه به عنوان set_x استفاده بشه)
+        spr->x = sense_get_mouse_x(*rt->sensing);
+        pen_move_to(spr->pen_state, canvas, spr->x, spr->y);
+    }
+    else if(block->type == "mouse_y" && spr && rt->sensing){
+        spr->y = sense_get_mouse_y(*rt->sensing);
+        pen_move_to(spr->pen_state, canvas, spr->x, spr->y);
+    }
+    else if(block->type == "distance_to_mouse" && spr && rt->sensing){
+        float d = sense_distance_to_mouse(*spr, *rt->sensing);
+        std::cout << "  distance_to_mouse: " << d << std::endl;
+    }
+    else if(block->type == "reset_timer"){
+        if(rt->sensing) sense_reset_timer(*rt->sensing);
+    }
+    else if(block->type == "set_drag_mode" && spr){
+        bool d = block->inputs.empty() ? true : (block->inputs[0] != 0);
+        sense_set_drag_mode(*spr, d);
+    }
+
     // ── Looks ──
     else if(block->type == "say" && spr)     { looks_say(*spr, "Hello!"); }
     else if(block->type == "show" && spr)    { looks_show(*spr); }
     else if(block->type == "hide" && spr)    { looks_hide(*spr); }
+    // ── Costumes ──
+    else if(block->type == "next_costume" && spr){
+        if(!spr->costumes.empty()){
+            spr->costume_index = (spr->costume_index + 1) % (int)spr->costumes.size();
+            spr->costume_path  = spr->costumes[spr->costume_index].path;
+        }
+    }
+    else if(block->type == "prev_costume" && spr){
+        if(!spr->costumes.empty()){
+            spr->costume_index = (spr->costume_index - 1 + (int)spr->costumes.size()) % (int)spr->costumes.size();
+            spr->costume_path  = spr->costumes[spr->costume_index].path;
+        }
+    }
+    else if(block->type == "set_costume" && spr){
+        int idx = block->inputs.empty() ? 0 : block->inputs[0];
+        if(idx >= 0 && idx < (int)spr->costumes.size()){
+            spr->costume_index = idx;
+            spr->costume_path  = spr->costumes[idx].path;
+        }
+    }
+    // ── Backdrops ──
+    else if(block->type == "next_backdrop"){
+        auto& bds = rt->project->backdrops;
+        if(!bds.empty())
+            rt->project->active_backdrop_idx =
+                (rt->project->active_backdrop_idx + 1) % (int)bds.size();
+    }
+    else if(block->type == "prev_backdrop"){
+        auto& bds = rt->project->backdrops;
+        if(!bds.empty())
+            rt->project->active_backdrop_idx =
+                (rt->project->active_backdrop_idx - 1 + (int)bds.size()) % (int)bds.size();
+    }
+    else if(block->type == "set_backdrop"){
+        int idx = block->inputs.empty() ? 0 : block->inputs[0];
+        if(idx >= 0 && idx < (int)rt->project->backdrops.size())
+            rt->project->active_backdrop_idx = idx;
+    }
     else if(block->type == "set_size" && spr){
         looks_set_size(*spr, block->inputs.empty() ? 100 : (float)block->inputs[0]);
     }
@@ -212,6 +293,107 @@ static void executePrimitive(Runtime* rt, Block* block){
         }
     }
 
+    // ── Variables ──
+    else if(block->type == "set_var"){
+        // inputs[0] = index متغیر در project.variables
+        // inputs[1] = مقدار جدید
+        if(block->inputs.size() >= 2){
+            int vi = block->inputs[0];
+            float val = (float)block->inputs[1];
+            if(vi >= 0 && vi < (int)rt->project->variables.size())
+                rt->project->variables[vi].value = val;
+        }
+    }
+    else if(block->type == "change_var"){
+        if(block->inputs.size() >= 2){
+            int vi = block->inputs[0];
+            float delta = (float)block->inputs[1];
+            if(vi >= 0 && vi < (int)rt->project->variables.size())
+                rt->project->variables[vi].value += delta;
+        }
+    }
+    else if(block->type == "show_var"){
+        if(!block->inputs.empty()){
+            int vi = block->inputs[0];
+            if(vi >= 0 && vi < (int)rt->project->variables.size())
+                rt->project->variables[vi].visible = true;
+        }
+    }
+    else if(block->type == "hide_var"){
+        if(!block->inputs.empty()){
+            int vi = block->inputs[0];
+            if(vi >= 0 && vi < (int)rt->project->variables.size())
+                rt->project->variables[vi].visible = false;
+        }
+    }
+
+    // ── Wait واقعی ──
+    else if(block->type == "wait"){
+        float secs = block->inputs.empty() ? 1.0f : (float)block->inputs[0];
+        // اضافه کردن wait frame به control stack
+        ControlFrame frame;
+        frame.blockId      = block->id;
+        frame.loop_target  = 0;
+        frame.childHeadId  = -1;
+        frame.counter      = 0;
+        frame.is_forever   = false;
+        frame.is_wait      = true;
+        frame.wait_end_ms  = SDL_GetTicks() + (Uint32)(secs * 1000.0f);
+        frame.after_loop_id = block->nextBlockId;
+        rt->controlStack.push_back(frame);
+        // در tick() چک می‌شه
+        return;
+    }
+
+    // ── if / if-else ──
+    else if(block->type == "if_then"){
+        // inputs[0] = condition value (0=false, non-zero=true)
+        // inputs[1] = id بلوک body (اولین بلوک داخل if)
+        int cond_val = block->inputs.empty() ? 0 : block->inputs[0];
+        int body_id  = block->inputs.size()>=2 ? block->inputs[1] : -1;
+        if(cond_val != 0 && body_id != -1){
+            // اجرای body: push frame مثل repeat ولی فقط یه بار
+            ControlFrame frame;
+            frame.blockId       = block->id;
+            frame.loop_target   = 1;
+            frame.childHeadId   = body_id;
+            frame.counter       = 0;
+            frame.is_forever    = false;
+            frame.is_wait       = false;
+            frame.after_loop_id = block->nextBlockId;
+            rt->controlStack.push_back(frame);
+            rt->currentBlockId = body_id;
+            return;
+        }
+        // condition false: skip body
+        rt->currentBlockId = block->nextBlockId;
+        return;
+    }
+    else if(block->type == "if_else"){
+        // inputs[0] = condition
+        // inputs[1] = then body id
+        // inputs[2] = else body id
+        int cond_val  = block->inputs.empty() ? 0 : block->inputs[0];
+        int then_id   = block->inputs.size()>=2 ? block->inputs[1] : -1;
+        int else_id   = block->inputs.size()>=3 ? block->inputs[2] : -1;
+        int body_id   = (cond_val != 0) ? then_id : else_id;
+        if(body_id != -1){
+            ControlFrame frame;
+            frame.blockId       = block->id;
+            frame.loop_target   = 1;
+            frame.childHeadId   = body_id;
+            frame.counter       = 0;
+            frame.is_forever    = false;
+            frame.is_wait       = false;
+            frame.after_loop_id = block->nextBlockId;
+            rt->controlStack.push_back(frame);
+            rt->currentBlockId = body_id;
+            return;
+        }
+        rt->currentBlockId = block->nextBlockId;
+        return;
+    }
+
     else if(block->type == "end_repeat"){
         // پایان یک دور loop
         if(!rt->controlStack.empty()){
@@ -296,14 +478,24 @@ void runtime_tick(Runtime* rt){
         return;
     }
 
+    // ── بررسی wait frame ──
+    if(!rt->controlStack.empty() && rt->controlStack.back().is_wait){
+        ControlFrame& wf = rt->controlStack.back();
+        if(SDL_GetTicks() >= wf.wait_end_ms){
+            int next = wf.after_loop_id;
+            rt->controlStack.pop_back();
+            rt->currentBlockId = next;
+        }
+        // در حال انتظار - هیچ block اجرا نکن
+        return;
+    }
+
     if(rt->currentBlockId == -1){
         if(!rt->controlStack.empty()){
-            // forever loop که end_repeat نداره: برگرد به head
             ControlFrame& f = rt->controlStack.back();
             if(f.is_forever){
                 rt->currentBlockId = f.childHeadId;
             } else {
-                // repeat بدون end_repeat: loop تموم شد
                 rt->controlStack.pop_back();
                 rt->currentBlockId = -1;
             }
