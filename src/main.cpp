@@ -25,6 +25,7 @@
 #include <cctype>   // برای std::isdigit
 #include "pen.h"
 #include "sensing.h"
+#include "sound.h"
 
 // ─── ثابت‌های ابعاد UI ───────────────────────────────────────────────────────
 // ابعاد پنجره — در main() بعد از fullscreen آپدیت می‌شوند
@@ -48,7 +49,7 @@ struct CategoryInfo {
     SDL_Color   color;
 };
 
-static const std::vector<CategoryInfo> CATEGORIES = {
+static std::vector<CategoryInfo> CATEGORIES = {  // non-const برای Extensions
     {"Motion",    {74,  144, 226, 255}},
     {"Looks",     {153, 102, 204, 255}},
     {"Sound",     {207,  99, 207, 255}},
@@ -106,8 +107,11 @@ static const std::vector<PaletteEntry> PALETTE_ENTRIES = {
     {"prev_costume",    "prev costume",            {},      "Looks"},
     {"set_costume",     "switch costume to",       {0},     "Looks"},
     // Sound
-    {"play_sound",      "play sound",             {},      "Sound"},
+    {"play_sound",      "play sound pop",         {0},     "Sound"},
+    {"play_sound_wait", "play sound pop until done",{0},   "Sound"},
     {"stop_sounds",     "stop all sounds",        {},      "Sound"},
+    {"set_volume",      "set volume to 100%",     {100},   "Sound"},
+    {"change_volume",   "change volume by -10",   {-10},   "Sound"},
     // Events
     {"when_start",      "when 🏁 clicked",        {},      "Events"},
     {"when_key",        "when space pressed",     {},      "Events"},
@@ -373,34 +377,51 @@ static void renderTextureFit(SDL_Renderer* r, SDL_Texture* tex, int x, int y, in
 struct UIState {
     std::string active_category = "Motion";
 
-    // drag
-    Block* dragging_block  = nullptr;
-    int    drag_offset_x   = 0;
-    int    drag_offset_y   = 0;
+    // drag block
+    Block* dragging_block    = nullptr;
+    int    drag_offset_x     = 0;
+    int    drag_offset_y     = 0;
     bool   drag_from_palette = false;
+    float  drag_start_x      = 0;   // موقعیت قبل از drag (برای undo)
+    float  drag_start_y      = 0;
 
-    // snap highlight
-    int    snap_target_id  = -1;
+    // snap
+    int    snap_target_id    = -1;
 
-    // ورودی متنی برای بلوک‌ها
+    // ورودی متنی
     int    editing_block_id  = -1;
     int    editing_input_idx = 0;
     std::string input_buffer = "";
+    int    old_input_val     = 0;   // برای undo input change
 
     // sprite panel
     int    active_sprite_id  = 1;
     bool   show_sprite_panel = true;
 
-    // Variables dialog
+    // Variables
     bool   show_var_dialog   = false;
     std::string new_var_name = "";
+    // Variable Monitor drag
+    int    dragging_var_idx  = -1;  // کدام variable monitor در حال drag است
+    int    var_drag_ox       = 0;
+    int    var_drag_oy       = 0;
 
-    // Pause button
-    bool   step_mode              = false;
-    // Extensions panel
-    bool   show_extensions_panel  = false;
-    // Costume/Backdrop dialog
-    bool   show_costume_panel     = false;
+    // Controls
+    bool   step_mode             = false;
+    bool   show_extensions_panel = false;
+    bool   show_costume_panel    = false;
+
+    // ── Undo / Redo ──────────────────────────────────────────────────────────
+    std::vector<UndoAction> undo_stack;
+    std::vector<UndoAction> redo_stack;
+    static const int MAX_UNDO = 50;
+
+    void pushUndo(const UndoAction& a) {
+        undo_stack.push_back(a);
+        if ((int)undo_stack.size() > MAX_UNDO)
+            undo_stack.erase(undo_stack.begin());
+        redo_stack.clear();  // هر action جدید redo را پاک می‌کند
+    }
 };
 
 // ─── پیدا کردن بلوک با id ─────────────────────────────────────────────────────
@@ -524,11 +545,21 @@ int main(int argc, char* argv[]) {
     }
 
     // ── پروژه و Runtime ──
+    // Stage coordinates (global در scope main برای event handlers)
+    int g_stage_x = 0, g_stage_y = 0, g_stage_w = 480, g_stage_h = 360;
+
     Project project;
     SensingManager sensing;
+    SoundManager   sound_mgr;
     Runtime rt;
     runtime_init(&rt, &project);
-    rt.sensing = &sensing;
+    rt.sensing   = &sensing;
+    rt.sound_mgr = &sound_mgr;
+    sound_init(sound_mgr);
+    // اضافه کردن صداهای پیش‌فرض
+    sound_add(sound_mgr, "pop",    "assets/sounds/pop.wav");
+    sound_add(sound_mgr, "meow",   "assets/sounds/meow.wav");
+    sound_add(sound_mgr, "laser",  "assets/sounds/laser.wav");
 
     int next_block_id = 100;
 
@@ -555,6 +586,7 @@ int main(int argc, char* argv[]) {
             spr.costume_path  = c.path;
         }
         project.sprites.push_back(spr);
+        // when_start_id را ذخیره کن (بعداً b.id را می‌دانیم)
 
         // backdrop پیش‌فرض
         project.backdrops.clear();
@@ -565,12 +597,13 @@ int main(int argc, char* argv[]) {
         }
         project.active_backdrop_idx = 0;
 
-        // بلوک when_start پیش‌فرض
+        // بلوک when_start پیش‌فرض (مربوط به spr)
         Block b;
         b.id          = next_block_id++;
         b.type        = "when_start";
         b.x           = SIDEBAR_W + 40;
         b.y           = TOOLBAR_H + 40;
+        b.sprite_owner = spr.id;  // ← مربوط به sprite1
         b.nextBlockId = -1;
         b.width       = BLOCK_W;
         b.height      = BLOCK_H;
@@ -617,6 +650,8 @@ int main(int argc, char* argv[]) {
     SDL_Rect btn_stop = {WINDOW_W/2 - 4,  8, 52, 34};
     SDL_Rect btn_step  = {WINDOW_W/2 + 52, 8, 52, 34};
     SDL_Rect btn_pause = {WINDOW_W/2 + 108, 8, 60, 34};
+    SDL_Rect btn_undo  = {WINDOW_W/2 + 174, 8, 44, 34};
+    SDL_Rect btn_redo  = {WINDOW_W/2 + 222, 8, 44, 34};
     // راست: New / Save / Load
     SDL_Rect btn_new  = {WINDOW_W - 195, 8, 55, 34};
     SDL_Rect btn_save = {WINDOW_W - 135, 8, 60, 34};
@@ -661,6 +696,46 @@ int main(int argc, char* argv[]) {
                     } else if (runtime_isPaused(&rt)) {
                         runtime_resume(&rt);
                         logInfo("Runtime resumed.");
+                    }
+                }
+                else if (SDL_PointInRect(&mp, &btn_undo)) {
+                    // شبیه‌سازی Ctrl+Z
+                    SDL_Event fake; fake.type=SDL_KEYDOWN;
+                    fake.key.keysym.sym=122 /*z*/;
+                    // مستقیم اجرا: تکرار منطق undo
+                    if (!ui.undo_stack.empty()) {
+                        UndoAction a = ui.undo_stack.back(); ui.undo_stack.pop_back();
+                        if (a.type==ActionType::BLOCK_MOVE){
+                            Block* b=findBlock(project,a.block_id);
+                            if(b){b->x=a.old_x;b->y=a.old_y;}
+                        } else if (a.type==ActionType::BLOCK_SNAP){
+                            Block* b=findBlock(project,a.block_id);
+                            if(b) b->nextBlockId=a.old_next_id;
+                        } else if (a.type==ActionType::INPUT_CHANGE){
+                            Block* b=findBlock(project,a.block_id);
+                            if(b&&a.input_idx<(int)b->inputs.size())
+                                b->inputs[a.input_idx]=a.old_input_val;
+                        }
+                        ui.redo_stack.push_back(a);
+                        logInfo("Undo via button");
+                    }
+                }
+                else if (SDL_PointInRect(&mp, &btn_redo)) {
+                    if (!ui.redo_stack.empty()) {
+                        UndoAction a = ui.redo_stack.back(); ui.redo_stack.pop_back();
+                        if (a.type==ActionType::BLOCK_MOVE){
+                            Block* b=findBlock(project,a.block_id);
+                            if(b){b->x=a.new_x;b->y=a.new_y;}
+                        } else if (a.type==ActionType::BLOCK_SNAP){
+                            Block* b=findBlock(project,a.block_id);
+                            if(b) b->nextBlockId=a.new_next_id;
+                        } else if (a.type==ActionType::INPUT_CHANGE){
+                            Block* b=findBlock(project,a.block_id);
+                            if(b&&a.input_idx<(int)b->inputs.size())
+                                b->inputs[a.input_idx]=a.new_input_val;
+                        }
+                        ui.undo_stack.push_back(a);
+                        logInfo("Redo via button");
                     }
                 }
                 else if (SDL_PointInRect(&mp, &btn_save)) {
@@ -757,27 +832,45 @@ int main(int argc, char* argv[]) {
                 }
                 // ── بستن Extensions Panel با کلیک X ──
                 else if (ui.show_extensions_panel) {
-                    int ep_w=340, ep_h=320;
+                    int ep_w=380;
+                    int ep_h=(int)EXTENSIONS.size()*70+70;
                     int ep_x=WINDOW_W/2-ep_w/2, ep_y=WINDOW_H/2-ep_h/2;
-                    SDL_Rect close_btn={ep_x+ep_w-30,ep_y+6,24,24};
+                    // دکمه X بستن
+                    SDL_Rect close_btn={ep_x+ep_w-34,ep_y+6,26,24};
                     if (SDL_PointInRect(&mp, &close_btn)) {
                         ui.show_extensions_panel = false;
                     } else {
-                        // کلیک روی هر extension برای toggle
-                        int ex=ep_x+10, ey2=ep_y+44;
+                        // کلیک روی دکمه Add/Added هر extension
+                        int ey2=ep_y+44;
                         for (int ei=0; ei<(int)EXTENSIONS.size(); ++ei) {
-                            SDL_Rect er={ex,ey2,ep_w-20,56};
-                            if (SDL_PointInRect(&mp, &er)) {
+                            int row_h=64;
+                            SDL_Rect btn_r={ep_x+ep_w-90, ey2+16, 74, 28};
+                            if (SDL_PointInRect(&mp, &btn_r)) {
                                 EXTENSIONS[ei].enabled = !EXTENSIONS[ei].enabled;
+                                // اگه فعال شد، category رو اضافه کن
                                 if (EXTENSIONS[ei].enabled) {
-                                    // اضافه کردن category اگه نبود
                                     bool found=false;
-                                    for (auto& c:CATEGORIES) if(c.name==EXTENSIONS[ei].name){found=true;break;}
-                                    // (CATEGORIES const است - فعلاً فقط Pen قابل toggle)
+                                    for (auto& c:CATEGORIES)
+                                        if(c.name==EXTENSIONS[ei].name){found=true;break;}
+                                    if(!found){
+                                        CategoryInfo ci;
+                                        ci.name=EXTENSIONS[ei].name;
+                                        ci.color=EXTENSIONS[ei].color;
+                                        CATEGORIES.push_back(ci);
+                                        ui.active_category = EXTENSIONS[ei].name;
+                                        logInfo("Extension added: " + EXTENSIONS[ei].name);
+                                    }
+                                } else {
+                                    // حذف category
+                                    CATEGORIES.erase(
+                                        std::remove_if(CATEGORIES.begin(),CATEGORIES.end(),
+                                            [&](const CategoryInfo& c){return c.name==EXTENSIONS[ei].name;}),
+                                        CATEGORIES.end());
+                                    logInfo("Extension removed: " + EXTENSIONS[ei].name);
                                 }
                                 break;
                             }
-                            ey2 += 62;
+                            ey2 += row_h;
                         }
                     }
                 }
@@ -811,6 +904,23 @@ int main(int argc, char* argv[]) {
                     }
                 }
 
+                // --- Variable Monitor drag (کلیک روی monitor روی stage) ---
+                else if (SDL_PointInRect(&mp, &area_stage) && !ui.show_var_dialog && !ui.show_extensions_panel) {
+                    for (int vi = 0; vi < (int)project.variables.size(); ++vi) {
+                        auto& var = project.variables[vi];
+                        if (!var.visible) continue;
+                        int mon_x = g_stage_x + (int)var.monitor_x;
+                        int mon_y = g_stage_y + (int)var.monitor_y;
+                        int mon_w = (int)(var.name.size()*8) + 68;
+                        SDL_Rect mr = {mon_x, mon_y, mon_w, 22};
+                        if (SDL_PointInRect(&mp, &mr)) {
+                            ui.dragging_var_idx = vi;
+                            ui.var_drag_ox = mx - mon_x;
+                            ui.var_drag_oy = my - mon_y;
+                            break;
+                        }
+                    }
+                }
                 // --- کلیک روی پالت: ساخت بلوک جدید ---
                 else if (SDL_PointInRect(&mp, &area_palette)) {
                     int rel_y = my - area_palette.y - 10;
@@ -895,6 +1005,8 @@ int main(int argc, char* argv[]) {
                                 ui.drag_offset_x     = mx - (int)b.x;
                                 ui.drag_offset_y     = my - (int)b.y;
                                 ui.drag_from_palette = false;
+                                ui.drag_start_x      = b.x;   // ذخیره برای Undo
+                                ui.drag_start_y      = b.y;
                                 break;
                             }
                         }
@@ -903,7 +1015,16 @@ int main(int argc, char* argv[]) {
             }
 
             // ── Mouse Motion ──
-                    else if (event.type == SDL_MOUSEMOTION && ui.dragging_block) {
+                    else if (event.type == SDL_MOUSEMOTION && ui.dragging_var_idx >= 0) {
+                // drag variable monitor
+                auto& var = project.variables[ui.dragging_var_idx];
+                var.monitor_x = (float)(event.motion.x - ui.var_drag_ox - g_stage_x);
+                var.monitor_y = (float)(event.motion.y - ui.var_drag_oy - g_stage_y);
+                // clamp داخل stage
+                var.monitor_x = std::max(0.f, std::min(var.monitor_x, (float)(g_stage_w - 100)));
+                var.monitor_y = std::max(0.f, std::min(var.monitor_y, (float)(g_stage_h - 30)));
+            }
+            else if (event.type == SDL_MOUSEMOTION && ui.dragging_block) {
                 ui.dragging_block->x = (float)(event.motion.x - ui.drag_offset_x);
                 ui.dragging_block->y = (float)(event.motion.y - ui.drag_offset_y);
                 ui.snap_target_id = findSnapTarget(*ui.dragging_block, project);
@@ -911,6 +1032,10 @@ int main(int argc, char* argv[]) {
 
             // ── Mouse Up ──
             if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
+                // رها کردن variable monitor
+                if (ui.dragging_var_idx >= 0) {
+                    ui.dragging_var_idx = -1;
+                }
                 if (ui.dragging_block) {
                     int mx = event.button.x;
                     int my = event.button.y;
@@ -949,6 +1074,73 @@ int main(int argc, char* argv[]) {
             if (event.type == SDL_KEYDOWN) {
                 int k2 = event.key.keysym.sym;
                 sense_update_key(sensing, k2, true);
+
+                // ── Undo: Ctrl+Z ──
+                if ((k2 == 122 /*z*/) && (SDL_GetModState() & KMOD_CTRL)) {
+                    if (!ui.undo_stack.empty()) {
+                        UndoAction a = ui.undo_stack.back();
+                        ui.undo_stack.pop_back();
+                        // اجرای undo
+                        if (a.type == ActionType::BLOCK_MOVE) {
+                            Block* b = findBlock(project, a.block_id);
+                            if (b) { b->x = a.old_x; b->y = a.old_y; }
+                        } else if (a.type == ActionType::BLOCK_SNAP) {
+                            // شکستن snap: nextBlockId رو برگردون
+                            Block* b = findBlock(project, a.block_id);
+                            if (b) b->nextBlockId = a.old_next_id;
+                        } else if (a.type == ActionType::BLOCK_ADD) {
+                            // حذف بلوک اضافه‌شده
+                            project.blocks.erase(
+                                std::remove_if(project.blocks.begin(), project.blocks.end(),
+                                    [&](const Block& bl){ return bl.id == a.block_id; }),
+                                project.blocks.end());
+                        } else if (a.type == ActionType::BLOCK_DELETE) {
+                            project.blocks.push_back(a.saved_block);
+                        } else if (a.type == ActionType::INPUT_CHANGE) {
+                            Block* b = findBlock(project, a.block_id);
+                            if (b && a.input_idx < (int)b->inputs.size())
+                                b->inputs[a.input_idx] = a.old_input_val;
+                        }
+                        ui.redo_stack.push_back(a);
+                        project.isModified = true;
+                        logInfo("Undo: " + std::to_string((int)a.type));
+                    }
+                }
+                // ── Redo: Ctrl+Y ──
+                else if ((k2 == SDLK_y) && (SDL_GetModState() & KMOD_CTRL)) {
+                    if (!ui.redo_stack.empty()) {
+                        UndoAction a = ui.redo_stack.back();
+                        ui.redo_stack.pop_back();
+                        // اجرای redo
+                        if (a.type == ActionType::BLOCK_MOVE) {
+                            Block* b = findBlock(project, a.block_id);
+                            if (b) { b->x = a.new_x; b->y = a.new_y; }
+                        } else if (a.type == ActionType::BLOCK_SNAP) {
+                            Block* b = findBlock(project, a.block_id);
+                            if (b) b->nextBlockId = a.new_next_id;
+                        } else if (a.type == ActionType::BLOCK_ADD) {
+                            project.blocks.push_back(a.saved_block);
+                        } else if (a.type == ActionType::BLOCK_DELETE) {
+                            project.blocks.erase(
+                                std::remove_if(project.blocks.begin(), project.blocks.end(),
+                                    [&](const Block& bl){ return bl.id == a.block_id; }),
+                                project.blocks.end());
+                        } else if (a.type == ActionType::INPUT_CHANGE) {
+                            Block* b = findBlock(project, a.block_id);
+                            if (b && a.input_idx < (int)b->inputs.size())
+                                b->inputs[a.input_idx] = a.new_input_val;
+                        }
+                        ui.undo_stack.push_back(a);
+                        project.isModified = true;
+                        logInfo("Redo: " + std::to_string((int)a.type));
+                    }
+                }
+                // ── Delete block: DEL key ──
+                else if (k2 == SDLK_DELETE && ui.editing_block_id == -1) {
+                    // حذف بلوک زیر ماوس (اگه snap نشده)
+                    // بعداً پیاده می‌شه با right-click menu
+                }
+
                 // ── Variable Dialog Keyboard ──
                 if (ui.show_var_dialog) {
                     if (k2 == SDLK_RETURN || k2 == SDLK_KP_ENTER) {
@@ -1082,9 +1274,29 @@ int main(int argc, char* argv[]) {
             SDL_Color pc = is_paused ? SDL_Color{200,160,0,255} : SDL_Color{160,130,0,255};
             fillRect(renderer, btn_pause.x, btn_pause.y, btn_pause.w, btn_pause.h, pc);
             drawRect(renderer, btn_pause.x, btn_pause.y, btn_pause.w, btn_pause.h, {100,80,0,255});
-            std::string plbl = is_paused ? "▶ Resume" : "⏸ Pause";
+            std::string plbl = is_paused ? "▶Res" : "||Pse";
             if (font_small) renderText(renderer, font_small, plbl,
                 btn_pause.x+5, btn_pause.y+11, {255,255,255,255});
+        }
+        // دکمه Undo (Ctrl+Z)
+        {
+            bool can_undo = !ui.undo_stack.empty();
+            SDL_Color uc = can_undo ? SDL_Color{80,80,120,255} : SDL_Color{50,50,60,255};
+            fillRect(renderer, btn_undo.x, btn_undo.y, btn_undo.w, btn_undo.h, uc);
+            drawRect(renderer, btn_undo.x, btn_undo.y, btn_undo.w, btn_undo.h,
+                can_undo?SDL_Color{120,120,180,255}:SDL_Color{60,60,80,255});
+            SDL_Color tc = can_undo?SDL_Color{255,255,255,255}:SDL_Color{100,100,100,255};
+            if (font_small) renderText(renderer, font_small, "↩ Z", btn_undo.x+4, btn_undo.y+11, tc);
+        }
+        // دکمه Redo (Ctrl+Y)
+        {
+            bool can_redo = !ui.redo_stack.empty();
+            SDL_Color rc = can_redo ? SDL_Color{80,80,120,255} : SDL_Color{50,50,60,255};
+            fillRect(renderer, btn_redo.x, btn_redo.y, btn_redo.w, btn_redo.h, rc);
+            drawRect(renderer, btn_redo.x, btn_redo.y, btn_redo.w, btn_redo.h,
+                can_redo?SDL_Color{120,120,180,255}:SDL_Color{60,60,80,255});
+            SDL_Color tc = can_redo?SDL_Color{255,255,255,255}:SDL_Color{100,100,100,255};
+            if (font_small) renderText(renderer, font_small, "↪ Y", btn_redo.x+4, btn_redo.y+11, tc);
         }
         // New / Save / Load (سمت راست toolbar)
         {
@@ -1323,11 +1535,15 @@ int main(int argc, char* argv[]) {
                  area_stage.w, area_stage.h, {50, 50, 55, 255});
 
         // Stage (صفحه نمایش sprite)
+
         int stage_x = area_stage.x + 10;
         int stage_y = area_stage.y + 10;
         int stage_draw_w = STAGE_W - 20;
         // stage با نسبت ۴:۳
         int stage_draw_h = stage_draw_w * 3 / 4;
+        // به‌روز کردن stage coordinates برای event loop
+        g_stage_x = stage_x; g_stage_y = stage_y;
+        g_stage_w = stage_draw_w; g_stage_h = stage_draw_h;
         // آپدیت sensing با موقعیت ماوس فعلی (هر فریم)
         {
             int raw_mx=0, raw_my=0;
@@ -1474,43 +1690,62 @@ int main(int argc, char* argv[]) {
 
         // ── Extensions Panel ─────────────────────────────────────────────────
         if (ui.show_extensions_panel) {
-            int ep_w = 340, ep_h = 320;
-            int ep_x = WINDOW_W/2 - ep_w/2;
-            int ep_y = WINDOW_H/2 - ep_h/2;
-            // پس‌زمینه
-            fillRect(renderer, ep_x, ep_y, ep_w, ep_h, {30,30,40,245});
-            drawRect(renderer, ep_x, ep_y, ep_w, ep_h, {80,80,100,255});
-            if (font_bold) renderText(renderer, font_bold, "Add Extension",
-                ep_x+12, ep_y+10, {255,255,255,255});
-            // دکمه بستن
-            fillRect(renderer, ep_x+ep_w-30, ep_y+6, 24, 24, {160,60,60,255});
-            if (font_small) renderText(renderer, font_small, "X",
-                ep_x+ep_w-22, ep_y+10, {255,255,255,255});
+            // ── dim overlay ──
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 0,0,0,120);
+            SDL_Rect overlay={0,0,WINDOW_W,WINDOW_H};
+            SDL_RenderFillRect(renderer,&overlay);
+            // blend mode restored automatically
+
+            int ep_w=380, ep_h=(int)EXTENSIONS.size()*70+70;
+            int ep_x=WINDOW_W/2-ep_w/2, ep_y=WINDOW_H/2-ep_h/2;
+            // پس‌زمینه panel
+            fillRect(renderer,ep_x,ep_y,ep_w,ep_h,{28,28,38,255});
+            drawRect(renderer,ep_x,ep_y,ep_w,ep_h,{90,90,120,255});
+            // نوار عنوان
+            fillRect(renderer,ep_x,ep_y,ep_w,36,{40,40,60,255});
+            if(font_bold) renderText(renderer,font_bold,"Add Extension",
+                ep_x+14,ep_y+9,{255,255,255,255});
+            // دکمه X
+            fillRect(renderer,ep_x+ep_w-34,ep_y+6,26,24,{180,50,50,255});
+            drawRect(renderer,ep_x+ep_w-34,ep_y+6,26,24,{255,80,80,255});
+            if(font_bold) renderText(renderer,font_bold,"X",
+                ep_x+ep_w-24,ep_y+9,{255,255,255,255});
+
             // لیست extensions
-            int ex = ep_x+10, ey = ep_y+44;
-            for (int ei = 0; ei < (int)EXTENSIONS.size(); ++ei) {
-                auto& ext = EXTENSIONS[ei];
-                SDL_Color bg = ext.enabled
-                    ? SDL_Color{(Uint8)(ext.color.r/2),(Uint8)(ext.color.g/2),(Uint8)(ext.color.b/2),255}
-                    : SDL_Color{50,50,60,255};
-                fillRect(renderer, ex, ey, ep_w-20, 56, bg);
-                drawRect(renderer, ex, ey, ep_w-20, 56,
-                    ext.enabled ? ext.color : SDL_Color{80,80,90,255});
-                // آیکون رنگی
-                fillRect(renderer, ex+4, ey+8, 40, 40, ext.color);
-                // متن
-                if (font_bold)  renderText(renderer, font_bold,  ext.name,
-                    ex+52, ey+10, {255,255,255,255});
-                if (font_small) renderText(renderer, font_small, ext.description,
-                    ex+52, ey+28, {180,180,180,255});
-                // وضعیت
-                std::string status = ext.enabled ? "Added" : "Add";
-                SDL_Color sc = ext.enabled ? SDL_Color{100,220,100,255}
-                                           : SDL_Color{200,200,200,255};
-                if (font_small) renderText(renderer, font_small, status,
-                    ex+ep_w-60, ey+20, sc);
-                ey += 62;
-                if (ey > ep_y + ep_h - 60) break;
+            int ey=ep_y+44;
+            for(int ei=0;ei<(int)EXTENSIONS.size();++ei){
+                auto& ext=EXTENSIONS[ei];
+                int row_h=64;
+                // پس‌زمینه ردیف
+                SDL_Color row_bg=ext.enabled
+                    ? SDL_Color{(Uint8)std::min(255,(int)ext.color.r/3+20),
+                                (Uint8)std::min(255,(int)ext.color.g/3+20),
+                                (Uint8)std::min(255,(int)ext.color.b/3+20),255}
+                    : SDL_Color{42,42,55,255};
+                fillRect(renderer,ep_x+8,ey,ep_w-16,row_h-4,row_bg);
+                drawRect(renderer,ep_x+8,ey,ep_w-16,row_h-4,
+                    ext.enabled?ext.color:SDL_Color{70,70,85,255});
+                // آیکون مربع رنگی
+                fillRect(renderer,ep_x+16,ey+10,44,44,ext.color);
+                drawRect(renderer,ep_x+16,ey+10,44,44,{255,255,255,60});
+                // نام (بزرگ)
+                if(font_bold) renderText(renderer,font_bold,ext.name,
+                    ep_x+68,ey+10,{255,255,255,255});
+                // توضیح (کوچک)
+                if(font_small) renderText(renderer,font_small,ext.description,
+                    ep_x+68,ey+28,{160,170,180,255});
+                // دکمه Add/Added
+                int btn_x=ep_x+ep_w-90, btn_y=ey+16, btn_w=74, btn_h=28;
+                SDL_Color btn_col=ext.enabled
+                    ? SDL_Color{40,160,40,255}
+                    : SDL_Color{60,120,220,255};
+                fillRect(renderer,btn_x,btn_y,btn_w,btn_h,btn_col);
+                drawRect(renderer,btn_x,btn_y,btn_w,btn_h,{255,255,255,60});
+                std::string btn_lbl=ext.enabled?"✓ Added":"Add";
+                if(font_small) renderText(renderer,font_small,btn_lbl,
+                    btn_x+(ext.enabled?8:20),btn_y+7,{255,255,255,255});
+                ey+=row_h;
             }
         }
 
@@ -1538,19 +1773,42 @@ int main(int argc, char* argv[]) {
                 dlg_x+148, dlg_y+85, {255,255,255,255});
         }
 
-        // ── نمایش متغیرها روی stage ──────────────────────────────────────────
-        {
-            int vx = area_stage.x + 4;
-            int vy = area_stage.y + 4;
-            for (auto& var : project.variables) {
-                if (!var.visible) continue;
-                std::string vstr = var.name + ": " + std::to_string((int)var.value);
-                // پس‌زمینه نمایش
-                fillRect(renderer, vx, vy, 110, 20, {220,220,255,200});
-                drawRect(renderer, vx, vy, 110, 20, {100,100,150,255});
-                if (font_small)
-                    renderText(renderer, font_small, vstr, vx+4, vy+3, {0,0,80,255});
-                vy += 24;
+        // ── نمایش Variable Monitor ها روی stage (draggable) ────────────────
+        for (int vi = 0; vi < (int)project.variables.size(); ++vi) {
+            auto& var = project.variables[vi];
+            if (!var.visible) continue;
+
+            // موقعیت monitor: stage_x + offset ذخیره‌شده در var
+            int mon_x = stage_x + (int)var.monitor_x;
+            int mon_y = stage_y + (int)var.monitor_y;
+
+            // محاسبه عرض بر اساس محتوا
+            char val_buf[32];
+            snprintf(val_buf, sizeof(val_buf), "%.4g", var.value);
+            int name_w  = (int)var.name.size() * 8;
+            int val_w   = (int)strlen(val_buf) * 8;
+            int mon_w   = name_w + val_w + 28;
+            int mon_h   = 22;
+
+            // Scratch-style monitor: نام با پس‌زمینه آبی + مقدار با پس‌زمینه سفید
+            // بخش نام
+            fillRect(renderer, mon_x,        mon_y, name_w+12, mon_h, {76,130,218,255});
+            // بخش مقدار
+            fillRect(renderer, mon_x+name_w+12, mon_y, val_w+16, mon_h, {255,255,255,220});
+            drawRect(renderer, mon_x,        mon_y, mon_w,       mon_h, {50,100,180,255});
+
+            if (font_small) {
+                // نام (سفید روی آبی)
+                renderText(renderer, font_small, var.name,
+                    mon_x+4, mon_y+4, {255,255,255,255});
+                // مقدار (تیره روی سفید)
+                renderText(renderer, font_small, std::string(val_buf),
+                    mon_x+name_w+16, mon_y+4, {20,20,60,255});
+            }
+
+            // هایلایت اگه در حال drag است
+            if (ui.dragging_var_idx == vi) {
+                drawRect(renderer, mon_x-2, mon_y-2, mon_w+4, mon_h+4, {255,200,50,255});
             }
         }
 
