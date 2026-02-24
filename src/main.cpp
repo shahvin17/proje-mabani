@@ -112,6 +112,13 @@ static const std::vector<PaletteEntry> PALETTE_ENTRIES = {
     {"stop_sounds",     "stop all sounds",        {},      "Sound"},
     {"set_volume",      "set volume to 100%",     {100},   "Sound"},
     {"change_volume",   "change volume by -10",   {-10},   "Sound"},
+    // Sensing (Ask)
+    {"ask",             "ask What's your name? and wait", {}, "Sensing"},
+    // Control (Clone)
+    {"create_clone",    "create clone of myself",  {-1},   "Control"},
+    {"when_clone_start","when I start as a clone",  {},    "Control"},
+    {"delete_clone",    "delete this clone",        {},    "Control"},
+    {"stop_this",       "stop this script",         {},    "Control"},
     // Events
     {"when_start",      "when 🏁 clicked",        {},      "Events"},
     {"when_key",        "when space pressed",     {},      "Events"},
@@ -420,9 +427,28 @@ struct UIState {
         undo_stack.push_back(a);
         if ((int)undo_stack.size() > MAX_UNDO)
             undo_stack.erase(undo_stack.begin());
-        redo_stack.clear();  // هر action جدید redo را پاک می‌کند
+        redo_stack.clear();
     }
+
+    // ── Right-click Context Menu ──────────────────────────────────────────
+    bool   show_context_menu  = false;
+    int    ctx_block_id       = -1;    // بلوک زیر راست-کلیک
+    int    ctx_menu_x         = 0;
+    int    ctx_menu_y         = 0;
+
+    // ── Backdrop Chooser ──────────────────────────────────────────────────
+    bool   show_backdrop_panel = false;
+    int    editing_backdrop_idx = -1;  // کدام backdrop در حال rename
+
+    // ── Costume Panel ─────────────────────────────────────────────────────
+    bool   show_costume_editor  = false;
+    int    editing_costume_idx  = -1;
 };
+
+// ── helper: SDL_PointInRect بدون address-of-rvalue ────────────────────────────
+static inline bool pointInRect(int px, int py, SDL_Rect r) {
+    return px>=r.x && px<r.x+r.w && py>=r.y && py<r.y+r.h;
+}
 
 // ─── پیدا کردن بلوک با id ─────────────────────────────────────────────────────
 static Block* findBlock(Project& p, int id) {
@@ -566,6 +592,15 @@ int main(int argc, char* argv[]) {
     // ── تابع کمکی: ساخت پروژه پیش‌فرض (sprite + when_start) ──
     auto setup_default_project = [&]() {
         project.sprites.clear();
+        project.variables.clear();
+        // متغیر "answer" برای Ask block (پیش‌فرض، مخفی)
+        {
+            Variable ans_var;
+            ans_var.name    = "answer";
+            ans_var.value   = 0.0f;
+            ans_var.visible = false;
+            project.variables.push_back(ans_var);
+        }
         // Sprite1 پیش‌فرض
         Sprite spr;
         spr.id           = 1;
@@ -652,6 +687,7 @@ int main(int argc, char* argv[]) {
     SDL_Rect btn_pause = {WINDOW_W/2 + 108, 8, 60, 34};
     SDL_Rect btn_undo  = {WINDOW_W/2 + 174, 8, 44, 34};
     SDL_Rect btn_redo  = {WINDOW_W/2 + 222, 8, 44, 34};
+    SDL_Rect btn_turbo = {WINDOW_W/2 + 270, 8, 54, 34};
     // راست: New / Save / Load
     SDL_Rect btn_new  = {WINDOW_W - 195, 8, 55, 34};
     SDL_Rect btn_save = {WINDOW_W - 135, 8, 60, 34};
@@ -669,6 +705,14 @@ int main(int argc, char* argv[]) {
                 int mx = event.button.x;
                 int my = event.button.y;
                 SDL_Point mp = {mx, my};
+
+                // ── بستن Context Menu با کلیک خارج ──
+                if (ui.show_context_menu) {
+                    const int CM_W=172, CM_H=28, N=5;
+                    SDL_Rect cm_rect={ui.ctx_menu_x, ui.ctx_menu_y, CM_W, N*CM_H};
+                    if (!pointInRect(mp.x, mp.y, {ui.ctx_menu_x,ui.ctx_menu_y,CM_W,N*CM_H}))
+                        ui.show_context_menu=false;
+                }
 
                 // محاسبه ناحیه sprite panel
                 SDL_Rect add_btn_rect  = {WINDOW_W - 44, WINDOW_H - SPRITE_PANEL_H + 8, 34, 30};
@@ -738,6 +782,10 @@ int main(int argc, char* argv[]) {
                         logInfo("Redo via button");
                     }
                 }
+                else if (SDL_PointInRect(&mp, &btn_turbo)) {
+                    rt.turbo_mode = !rt.turbo_mode;
+                    logInfo(rt.turbo_mode ? "Turbo ON (30x)" : "Turbo OFF");
+                }
                 else if (SDL_PointInRect(&mp, &btn_save)) {
                     saveProjectAndMark(project, "project.fop");
                     logInfo("Project saved.");
@@ -783,6 +831,90 @@ int main(int argc, char* argv[]) {
                     project.sprites.push_back(spr);
                     ui.active_sprite_id = spr.id;
                     logInfo("Added sprite: " + spr.name);
+                }
+                // --- دکمه Backdrop Chooser (زیر stage) ---
+                else if (pointInRect(mp.x,mp.y,{g_stage_x,g_stage_y+g_stage_h+4,90,22})) {
+                    ui.show_backdrop_panel  = !ui.show_backdrop_panel;
+                    ui.show_costume_editor  = false;
+                    ui.show_extensions_panel = false;
+                    ui.show_context_menu    = false;
+                }
+                // --- دکمه Costume Editor (زیر stage) ---
+                else if (pointInRect(mp.x,mp.y,{g_stage_x+96,g_stage_y+g_stage_h+4,90,22})) {
+                    ui.show_costume_editor   = !ui.show_costume_editor;
+                    ui.show_backdrop_panel   = false;
+                    ui.show_extensions_panel = false;
+                    ui.show_context_menu     = false;
+                }
+                // --- Backdrop Panel کلیک ها ---
+                else if (ui.show_backdrop_panel) {
+                    int bp_w=340, bp_h=300;
+                    int bp_x=g_stage_x, bp_y=g_stage_y+g_stage_h-bp_h;
+                    if (bp_y < g_stage_y) bp_y=g_stage_y;
+                    // X بستن
+                    SDL_Rect bd_x_btn={bp_x+bp_w-30,bp_y+4,24,24};
+                    if (SDL_PointInRect(&mp,&bd_x_btn)) {
+                        ui.show_backdrop_panel=false;
+                    } else {
+                        // کلیک روی backdrop برای فعال کردن
+                        int by=bp_y+38;
+                        for (int bi=0; bi<(int)project.backdrops.size(); ++bi) {
+                            SDL_Rect br={bp_x+6,by,bp_w-12,36};
+                            if (SDL_PointInRect(&mp,&br)) {
+                                project.active_backdrop_idx=bi;
+                                project.isModified=true;
+                                logInfo("Backdrop switched to: "+project.backdrops[bi].name);
+                                break;
+                            }
+                            by+=40;
+                        }
+                        // دکمه Add Backdrop
+                        SDL_Rect ab_r={bp_x+6,bp_y+bp_h-36,bp_w-12,28};
+                        if (SDL_PointInRect(&mp,&ab_r)) {
+                            Backdrop nb; nb.name="backdrop"+std::to_string(project.backdrops.size()+1); nb.path="";
+                            project.backdrops.push_back(nb);
+                            project.active_backdrop_idx=(int)project.backdrops.size()-1;
+                            project.isModified=true;
+                            logInfo("Added backdrop: "+nb.name);
+                        }
+                    }
+                }
+                // --- Costume Panel کلیک ها ---
+                else if (ui.show_costume_editor) {
+                    Sprite* act_spr=nullptr;
+                    for (auto& s:project.sprites) if(s.id==ui.active_sprite_id){act_spr=&s;break;}
+                    int cp_w=300, cp_h=280;
+                    int cp_x=g_stage_x+g_stage_w-cp_w, cp_y=g_stage_y;
+                    // X
+                    SDL_Rect cs_x_btn={cp_x+cp_w-30,cp_y+4,24,24};
+                    if (SDL_PointInRect(&mp,&cs_x_btn)) {
+                        ui.show_costume_editor=false;
+                    } else if (act_spr) {
+                        // کلیک روی costume
+                        int cy2=cp_y+38;
+                        for (int ci=0; ci<(int)act_spr->costumes.size(); ++ci) {
+                            SDL_Rect cr={cp_x+6,cy2,cp_w-12,40};
+                            if (SDL_PointInRect(&mp,&cr)) {
+                                act_spr->costume_index=ci;
+                                act_spr->costume_path=act_spr->costumes[ci].path;
+                                project.isModified=true;
+                                logInfo("Costume: "+act_spr->costumes[ci].name);
+                                break;
+                            }
+                            cy2+=44;
+                        }
+                        // دکمه Add Costume
+                        SDL_Rect ac_r={cp_x+6,cp_y+cp_h-36,cp_w-12,28};
+                        if (SDL_PointInRect(&mp,&ac_r)) {
+                            Costume nc;
+                            nc.name="costume"+std::to_string(act_spr->costumes.size()+1);
+                            nc.path="";
+                            act_spr->costumes.push_back(nc);
+                            act_spr->costume_index=(int)act_spr->costumes.size()-1;
+                            project.isModified=true;
+                            logInfo("Added costume: "+nc.name);
+                        }
+                    }
                 }
                 // --- دکمه Show/Hide sprite ---
                 else if (SDL_PointInRect(&mp, &vis_btn)) {
@@ -874,6 +1006,73 @@ int main(int argc, char* argv[]) {
                         }
                     }
                 }
+                // --- Context Menu click ---
+                else if (ui.show_context_menu) {
+                    const int CM_W = 170, CM_ITEM_H = 28;
+                    // آیتم‌ها: Duplicate, Delete, Add Comment, Disable
+                    struct CtxItem { std::string label; int action; };
+                    static const CtxItem CTX_ITEMS[] = {
+                        {"Duplicate block", 1},
+                        {"Delete block",    2},
+                        {"Add comment",     3},
+                        {"Disable block",   4},
+                        {"Clean up blocks", 5},
+                    };
+                    const int N_CTX = 5;
+                    bool hit = false;
+                    for (int ci = 0; ci < N_CTX; ++ci) {
+                        SDL_Rect ir = {ui.ctx_menu_x, ui.ctx_menu_y + ci*CM_ITEM_H,
+                                       CM_W, CM_ITEM_H};
+                        if (SDL_PointInRect(&mp, &ir)) {
+                            hit = true;
+                            Block* cb = findBlock(project, ui.ctx_block_id);
+                            if (CTX_ITEMS[ci].action == 1 && cb) {
+                                // Duplicate
+                                Block nb = *cb;
+                                nb.id = next_block_id++;
+                                nb.x += 20; nb.y += 20;
+                                nb.nextBlockId = -1;
+                                // ثبت undo
+                                UndoAction ua; ua.type=ActionType::BLOCK_ADD;
+                                ua.block_id=nb.id; ua.saved_block=nb;
+                                ui.pushUndo(ua);
+                                project.blocks.push_back(nb);
+                                logInfo("Duplicated block: " + nb.type);
+                            }
+                            else if (CTX_ITEMS[ci].action == 2 && cb) {
+                                // Delete
+                                UndoAction ua; ua.type=ActionType::BLOCK_DELETE;
+                                ua.block_id=cb->id; ua.saved_block=*cb;
+                                ui.pushUndo(ua);
+                                // قطع کردن لینک از بلوک قبلی
+                                for (auto& ob : project.blocks)
+                                    if (ob.nextBlockId == cb->id) ob.nextBlockId=-1;
+                                project.blocks.erase(
+                                    std::remove_if(project.blocks.begin(),project.blocks.end(),
+                                        [&](const Block& bl){return bl.id==ui.ctx_block_id;}),
+                                    project.blocks.end());
+                                logInfo("Deleted block");
+                            }
+                            else if (CTX_ITEMS[ci].action == 5) {
+                                // Clean up: مرتب کردن بلوک‌های loose
+                                float cx = SIDEBAR_W + 30.f, cy = TOOLBAR_H + 30.f;
+                                for (auto& bl : project.blocks) {
+                                    // بلوک بدون parent = root
+                                    bool is_child = false;
+                                    for (auto& ob : project.blocks)
+                                        if (ob.nextBlockId == bl.id){ is_child=true; break; }
+                                    if (!is_child && bl.type!="when_start") {
+                                        bl.x = cx; bl.y = cy; cy += bl.height + 10;
+                                        if (cy > WINDOW_H - 100) { cy=TOOLBAR_H+30; cx+=220; }
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    if (!hit) ui.show_context_menu = false;
+                    if (CTX_ITEMS[0].action != 0) ui.show_context_menu = false;
+                }
                 // --- Variable dialog click ---
                 else if (ui.show_var_dialog) {
                     int dlg_w=300, dlg_h=120;
@@ -904,6 +1103,17 @@ int main(int argc, char* argv[]) {
                     }
                 }
 
+                // --- Ask Dialog: کلیک دکمه ✓ ---
+                else if (rt.ask_active && SDL_PointInRect(&mp, &area_stage)) {
+                    // بررسی کلیک روی دکمه ارسال
+                    int aw = g_stage_w - 40;
+                    int ax = g_stage_x + 20;
+                    int ay = g_stage_y + g_stage_h - 60;
+                    SDL_Rect submit_rect = {ax+aw-42, ay+4, 40, 40};
+                    if (SDL_PointInRect(&mp, &submit_rect)) {
+                        runtime_submit_answer(&rt, rt.ask_buffer);
+                    }
+                }
                 // --- Variable Monitor drag (کلیک روی monitor روی stage) ---
                 else if (SDL_PointInRect(&mp, &area_stage) && !ui.show_var_dialog && !ui.show_extensions_panel) {
                     for (int vi = 0; vi < (int)project.variables.size(); ++vi) {
@@ -1075,6 +1285,25 @@ int main(int argc, char* argv[]) {
                 int k2 = event.key.keysym.sym;
                 sense_update_key(sensing, k2, true);
 
+                // ── Ask Dialog keyboard ──
+                if (rt.ask_active) {
+                    if (k2 == SDLK_RETURN || k2 == SDLK_KP_ENTER) {
+                        runtime_submit_answer(&rt, rt.ask_buffer);
+                    } else if (k2 == SDLK_BACKSPACE && !rt.ask_buffer.empty()) {
+                        rt.ask_buffer.pop_back();
+                    } else if (k2 == SDLK_ESCAPE) {
+                        runtime_submit_answer(&rt, "");
+                    }
+                } else if (k2 == SDLK_ESCAPE) {
+                    // ESC: بستن همه panel های باز
+                    ui.show_context_menu     = false;
+                    ui.show_backdrop_panel   = false;
+                    ui.show_costume_editor   = false;
+                    ui.show_extensions_panel = false;
+                    ui.show_var_dialog       = false;
+                    ui.editing_block_id      = -1;
+                }
+
                 // ── Undo: Ctrl+Z ──
                 if ((k2 == 122 /*z*/) && (SDL_GetModState() & KMOD_CTRL)) {
                     if (!ui.undo_stack.empty()) {
@@ -1207,8 +1436,34 @@ int main(int argc, char* argv[]) {
             else if (event.type == SDL_KEYUP) {
                 sense_update_key(sensing, (int)event.key.keysym.sym, false);
             }
+            // ── Right-click → Context Menu ──
+            else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == 3  /*SDL_BUTTON_RIGHT*/) {
+                int rx = event.button.x, ry = event.button.y;
+                ui.show_context_menu  = false;
+                ui.ctx_block_id       = -1;
+                // پیدا کردن بلوک زیر ماوس
+                for (auto& b : project.blocks) {
+                    SDL_Rect br = {(int)b.x, (int)b.y, (int)b.width, (int)b.height};
+                    if (pointInRect(rx, ry, br)) {
+                        ui.show_context_menu = true;
+                        ui.ctx_block_id      = b.id;
+                        ui.ctx_menu_x        = rx;
+                        ui.ctx_menu_y        = ry;
+                        break;
+                    }
+                }
+                // بستن پانل‌های دیگه
+                if (ui.show_context_menu) {
+                    ui.show_backdrop_panel = false;
+                    ui.show_extensions_panel = false;
+                }
+            }
             else if (event.type == SDL_TEXTINPUT) {
-                if (ui.show_var_dialog) {
+                // ── Ask dialog: تایپ متن ──
+                if (rt.ask_active) {
+                    rt.ask_buffer += event.text.text;
+                }
+                else if (ui.show_var_dialog) {
                     for (char c : std::string(event.text.text))
                         if (std::isalnum((unsigned char)c) || c=='_')
                             ui.new_var_name += c;
@@ -1297,6 +1552,18 @@ int main(int argc, char* argv[]) {
                 can_redo?SDL_Color{120,120,180,255}:SDL_Color{60,60,80,255});
             SDL_Color tc = can_redo?SDL_Color{255,255,255,255}:SDL_Color{100,100,100,255};
             if (font_small) renderText(renderer, font_small, "↪ Y", btn_redo.x+4, btn_redo.y+11, tc);
+        }
+        // دکمه Turbo ⚡
+        {
+            bool turbo = rt.turbo_mode;
+            SDL_Color tc = turbo ? SDL_Color{200,160,0,255} : SDL_Color{55,55,65,255};
+            fillRect(renderer, btn_turbo.x, btn_turbo.y, btn_turbo.w, btn_turbo.h, tc);
+            drawRect(renderer, btn_turbo.x, btn_turbo.y, btn_turbo.w, btn_turbo.h,
+                turbo?SDL_Color{255,220,0,255}:SDL_Color{90,90,110,255});
+            if (font_small) renderText(renderer, font_small,
+                turbo ? "⚡ ON" : "⚡ OFF",
+                btn_turbo.x+6, btn_turbo.y+11,
+                turbo?SDL_Color{20,20,0,255}:SDL_Color{160,160,160,255});
         }
         // New / Save / Load (سمت راست toolbar)
         {
@@ -1615,6 +1882,27 @@ int main(int argc, char* argv[]) {
         // رندر spriteها
         // مختصات Scratch: x=0,y=0 مرکز stage. x از -240 تا +240، y از -180 تا +180
         // مختصات Stage روی صفحه: stage_x..stage_x+STAGE_W-20
+
+        // ── رندر Clone ها ─────────────────────────────────────────────────
+        for (auto& clone : rt.clones) {
+            const Sprite& cspr = clone.data;
+            if (!cspr.visible) continue;
+            float px = stage_x + stage_draw_w/2.0f + cspr.x * stage_draw_w / 480.0f;
+            float py = stage_y + stage_draw_h/2.0f - cspr.y * stage_draw_h / 360.0f;
+            float sw = cspr.width  * cspr.size_percent/100.f * stage_draw_w/480.f;
+            float sh = cspr.height * cspr.size_percent/100.f * stage_draw_h/360.f;
+            SDL_Rect dr={(int)(px-sw/2),(int)(py-sh/2),(int)sw,(int)sh};
+            SDL_SetRenderDrawBlendMode(renderer,SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer,100,149,237,160);
+            SDL_RenderFillRect(renderer,&dr);
+            SDL_SetRenderDrawColor(renderer,60,100,200,220);
+            SDL_RenderDrawRect(renderer,&dr);
+            if (font_small)
+                renderText(renderer,font_small,"*",
+                    (int)px-3,(int)py-5,{200,220,255,255});
+        }
+
+        // ── رندر Sprite های اصلی ──────────────────────────────────────────
         for (auto& spr : project.sprites) {
             if (!spr.visible) continue;
             int sx = stage_x + stage_draw_w/2 + (int)(spr.x * stage_draw_w / 480.0f);
@@ -1688,6 +1976,119 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // ── Backdrop Chooser Panel ───────────────────────────────────────────
+        if (ui.show_backdrop_panel) {
+            int bp_w = 340, bp_h = 300;
+            int bp_x = stage_x, bp_y = stage_y + stage_draw_h - bp_h;
+            // clamp
+            if (bp_y < stage_y) bp_y = stage_y;
+
+            // سایه
+            fillRect(renderer, bp_x+4, bp_y+4, bp_w, bp_h, {0,0,0,80});
+            // پس‌زمینه
+            fillRect(renderer, bp_x, bp_y, bp_w, bp_h, {24,26,38,250});
+            drawRect(renderer, bp_x, bp_y, bp_w, bp_h, {80,100,160,255});
+
+            // نوار عنوان
+            fillRect(renderer, bp_x, bp_y, bp_w, 32, {36,50,90,255});
+            if (font_bold) renderText(renderer,font_bold,"Backdrops",
+                bp_x+10,bp_y+8,{255,255,255,255});
+            // دکمه X
+            fillRect(renderer,bp_x+bp_w-30,bp_y+4,24,24,{160,40,40,255});
+            if (font_bold) renderText(renderer,font_bold,"X",
+                bp_x+bp_w-22,bp_y+8,{255,255,255,255});
+
+            // لیست backdrop ها
+            int by = bp_y+38;
+            for (int bi=0; bi<(int)project.backdrops.size(); ++bi) {
+                auto& bd = project.backdrops[bi];
+                bool active = (bi == project.active_backdrop_idx);
+                SDL_Color row_c = active
+                    ? SDL_Color{50,80,160,255} : SDL_Color{36,40,58,255};
+                fillRect(renderer, bp_x+6, by, bp_w-12, 36, row_c);
+                drawRect(renderer, bp_x+6, by, bp_w-12, 36,
+                    active?SDL_Color{100,150,255,255}:SDL_Color{60,70,100,255});
+                // پیش‌نمایش رنگ (placeholder)
+                SDL_Color prev_c = {(Uint8)(40+bi*40),(Uint8)(80+bi*30),(Uint8)(180-bi*20),255};
+                fillRect(renderer, bp_x+10, by+4, 44, 28, prev_c);
+                drawRect(renderer, bp_x+10, by+4, 44, 28, {200,200,200,80});
+                // نام
+                if (font_small) renderText(renderer,font_small,bd.name,
+                    bp_x+62,by+12,active?SDL_Color{255,255,255,255}:SDL_Color{180,190,210,255});
+                // آیکون active
+                if (active && font_small)
+                    renderText(renderer,font_small,"✓",bp_x+bp_w-26,by+12,{100,220,100,255});
+                by += 40;
+                if (by > bp_y+bp_h-60) break;
+            }
+
+            // دکمه "Add Backdrop"
+            {
+                int ab_y = bp_y+bp_h-36;
+                fillRect(renderer,bp_x+6,ab_y,bp_w-12,28,{40,80,50,255});
+                drawRect(renderer,bp_x+6,ab_y,bp_w-12,28,{60,160,80,255});
+                if(font_small) renderText(renderer,font_small,"+ Add Backdrop",
+                    bp_x+bp_w/2-55,ab_y+7,{180,240,180,255});
+            }
+        }
+
+        // ── Costume Editor Panel ──────────────────────────────────────────────
+        if (ui.show_costume_editor) {
+            // sprite فعال
+            Sprite* act_spr = nullptr;
+            for (auto& s : project.sprites) if (s.id==ui.active_sprite_id){ act_spr=&s; break; }
+
+            int cp_w=300, cp_h=280;
+            int cp_x=stage_x+stage_draw_w-cp_w, cp_y=stage_y;
+
+            // سایه
+            fillRect(renderer,cp_x+4,cp_y+4,cp_w,cp_h,{0,0,0,80});
+            // پس‌زمینه
+            fillRect(renderer,cp_x,cp_y,cp_w,cp_h,{26,24,40,250});
+            drawRect(renderer,cp_x,cp_y,cp_w,cp_h,{100,80,160,255});
+
+            // عنوان
+            fillRect(renderer,cp_x,cp_y,cp_w,32,{50,36,90,255});
+            std::string ct_title = "Costumes";
+            if (act_spr) ct_title += " - " + act_spr->name;
+            if(font_bold) renderText(renderer,font_bold,ct_title,cp_x+8,cp_y+8,{255,255,255,255});
+            // X
+            fillRect(renderer,cp_x+cp_w-30,cp_y+4,24,24,{160,40,40,255});
+            if(font_bold) renderText(renderer,font_bold,"X",cp_x+cp_w-22,cp_y+8,{255,255,255,255});
+
+            if (act_spr) {
+                int cy2 = cp_y+38;
+                for (int ci=0; ci<(int)act_spr->costumes.size(); ++ci) {
+                    auto& cos = act_spr->costumes[ci];
+                    bool active = (ci==act_spr->costume_index);
+                    SDL_Color row_c=active?SDL_Color{80,50,160,255}:SDL_Color{38,36,58,255};
+                    fillRect(renderer,cp_x+6,cy2,cp_w-12,40,row_c);
+                    drawRect(renderer,cp_x+6,cy2,cp_w-12,40,
+                        active?SDL_Color{160,120,255,255}:SDL_Color{70,60,100,255});
+                    // preview
+                    SDL_Color pc={(Uint8)(180-ci*30),(Uint8)(100+ci*40),(Uint8)(200+ci*10),255};
+                    fillRect(renderer,cp_x+10,cy2+4,36,32,pc);
+                    drawRect(renderer,cp_x+10,cy2+4,36,32,{200,200,200,60});
+                    // نام
+                    if(font_small) renderText(renderer,font_small,cos.name,
+                        cp_x+54,cy2+8,active?SDL_Color{255,255,255,255}:SDL_Color{180,180,210,255});
+                    // شماره
+                    if(font_small) renderText(renderer,font_small,
+                        "#"+std::to_string(ci+1),cp_x+54,cy2+22,{120,120,150,255});
+                    if(active && font_small)
+                        renderText(renderer,font_small,"✓",cp_x+cp_w-24,cy2+14,{140,220,140,255});
+                    cy2+=44;
+                    if(cy2>cp_y+cp_h-50) break;
+                }
+                // دکمه Add Costume
+                int ac_y=cp_y+cp_h-36;
+                fillRect(renderer,cp_x+6,ac_y,cp_w-12,28,{50,40,80,255});
+                drawRect(renderer,cp_x+6,ac_y,cp_w-12,28,{120,80,200,255});
+                if(font_small) renderText(renderer,font_small,"+ Add Costume",
+                    cp_x+cp_w/2-50,ac_y+7,{200,180,255,255});
+            }
+        }
+
         // ── Extensions Panel ─────────────────────────────────────────────────
         if (ui.show_extensions_panel) {
             // ── dim overlay ──
@@ -1749,6 +2150,85 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // ── Right-click Context Menu ─────────────────────────────────────────
+        if (ui.show_context_menu && ui.ctx_block_id >= 0) {
+            struct CtxItem { const char* label; SDL_Color color; };
+            static const CtxItem CM[] = {
+                {"Duplicate block", {70, 140, 220, 255}},
+                {"Delete block",    {200,  60,  60, 255}},
+                {"Add comment",     {80,  160,  80, 255}},
+                {"Disable block",   {140, 100,  40, 255}},
+                {"Clean up blocks", {100,  80, 160, 255}},
+            };
+            const int N=5, CM_W=172, CM_H=28;
+            int cmx = ui.ctx_menu_x, cmy = ui.ctx_menu_y;
+            // clamp به داخل window
+            if (cmx+CM_W > WINDOW_W) cmx = WINDOW_W-CM_W-4;
+            if (cmy+N*CM_H > WINDOW_H) cmy = WINDOW_H-N*CM_H-4;
+
+            // سایه
+            fillRect(renderer, cmx+3, cmy+3, CM_W, N*CM_H, {0,0,0,80});
+            // پس‌زمینه کل
+            fillRect(renderer, cmx, cmy, CM_W, N*CM_H, {28,30,42,248});
+            drawRect(renderer, cmx, cmy, CM_W, N*CM_H, {80,90,120,255});
+
+            // hover تشخیص
+            int hov_mx, hov_my;
+            SDL_GetMouseState(&hov_mx, &hov_my);
+
+            for (int ci=0; ci<N; ++ci) {
+                SDL_Rect ir = {cmx, cmy+ci*CM_H, CM_W, CM_H};
+                bool hov = pointInRect(hov_mx, hov_my, ir);
+                // پس‌زمینه hover
+                if (hov) fillRect(renderer, ir.x, ir.y, ir.w, ir.h, {50,55,75,255});
+                // خط جداکننده
+                if (ci>0) {
+                    SDL_SetRenderDrawColor(renderer,60,65,85,255);
+                    SDL_RenderDrawLine(renderer,cmx,cmy+ci*CM_H,cmx+CM_W,cmy+ci*CM_H);
+                }
+                // آیکون رنگی کوچک
+                fillRect(renderer, cmx+4, cmy+ci*CM_H+8, 12, 12, CM[ci].color);
+                // متن
+                if (font_small)
+                    renderText(renderer, font_small, CM[ci].label,
+                        cmx+20, cmy+ci*CM_H+8,
+                        hov?SDL_Color{255,255,255,255}:SDL_Color{200,205,215,255});
+            }
+        }
+
+        // ── Ask & Answer Dialog ──────────────────────────────────────────────
+        if (rt.ask_active) {
+            // نمایش input box روی stage
+            int aw = stage_draw_w - 40;
+            int ax = stage_x + 20;
+            int ay = stage_y + stage_draw_h - 60;
+
+            // پس‌زمینه
+            fillRect(renderer, ax, ay, aw, 48, {240,240,255,245});
+            drawRect(renderer, ax, ay, aw, 48, {80,120,220,255});
+
+            // دکمه ارسال (✓)
+            int submit_w = 40;
+            fillRect(renderer, ax+aw-submit_w-2, ay+4, submit_w, 40,
+                {80,160,80,255});
+            drawRect(renderer, ax+aw-submit_w-2, ay+4, submit_w, 40,
+                {60,200,60,255});
+            if (font_bold) renderText(renderer, font_bold, "✓",
+                ax+aw-submit_w+8, ay+12, {255,255,255,255});
+
+            // متن تایپ‌شده
+            std::string display = rt.ask_buffer;
+            if ((SDL_GetTicks()/500)%2==0) display += "|";  // cursor چشمک‌زن
+            fillRect(renderer, ax+4, ay+4, aw-submit_w-12, 40, {255,255,255,255});
+            drawRect(renderer, ax+4, ay+4, aw-submit_w-12, 40, {160,180,230,255});
+            if (font_small && !display.empty())
+                renderText(renderer, font_small, display,
+                    ax+8, ay+14, {20,20,80,255});
+            else if (font_small)
+                renderText(renderer, font_small, "Type your answer...",
+                    ax+8, ay+14, {160,160,200,255});
+        }
+
         // ── Variable Dialog ──────────────────────────────────────────────────
         if (ui.show_var_dialog) {
             int dlg_w = 300, dlg_h = 120;
@@ -1771,6 +2251,51 @@ int main(int argc, char* argv[]) {
                 dlg_x+85,  dlg_y+85, {255,255,255,255});
             if (font_small) renderText(renderer, font_small, "Cancel",
                 dlg_x+148, dlg_y+85, {255,255,255,255});
+        }
+
+        // ── دکمه Backdrop chooser (پایین-چپ stage) ──────────────────────────
+        {
+            SDL_Rect bd_btn = {stage_x, stage_y + stage_draw_h + 4, 90, 22};
+            bool bd_hov = false;
+            {
+                int hx,hy; SDL_GetMouseState(&hx,&hy);
+                bd_hov = pointInRect(hx, hy, bd_btn);
+            }
+            fillRect(renderer, bd_btn.x, bd_btn.y, bd_btn.w, bd_btn.h,
+                ui.show_backdrop_panel ? SDL_Color{60,120,220,255}
+                : (bd_hov ? SDL_Color{50,80,160,255} : SDL_Color{35,45,70,255}));
+            drawRect(renderer, bd_btn.x, bd_btn.y, bd_btn.w, bd_btn.h, {80,110,200,255});
+            if (font_small)
+                renderText(renderer, font_small, "🎨 Backdrop",
+                    bd_btn.x+4, bd_btn.y+5, {200,220,255,255});
+        }
+        // ── دکمه Costume editor (کنار Backdrop) ──────────────────────────────
+        {
+            SDL_Rect cs_btn = {stage_x+96, stage_y + stage_draw_h + 4, 90, 22};
+            bool cs_hov = false;
+            { int hx,hy; SDL_GetMouseState(&hx,&hy);
+              cs_hov = pointInRect(hx, hy, cs_btn); }
+            fillRect(renderer, cs_btn.x, cs_btn.y, cs_btn.w, cs_btn.h,
+                ui.show_costume_editor ? SDL_Color{120,60,220,255}
+                : (cs_hov ? SDL_Color{90,50,160,255} : SDL_Color{45,35,70,255}));
+            drawRect(renderer, cs_btn.x, cs_btn.y, cs_btn.w, cs_btn.h, {120,80,200,255});
+            if (font_small)
+                renderText(renderer, font_small, "👔 Costumes",
+                    cs_btn.x+4, cs_btn.y+5, {220,200,255,255});
+        }
+
+        // ── Clone counter و Turbo indicator روی stage ────────────────────────
+        if (!rt.clones.empty()) {
+            std::string ci = std::to_string(rt.clones.size()) + " clones";
+            int ciw = (int)ci.size()*7+8;
+            fillRect(renderer,stage_x+stage_draw_w-ciw-4,stage_y+stage_draw_h-20,ciw,16,{40,80,180,210});
+            if(font_small) renderText(renderer,font_small,ci,
+                stage_x+stage_draw_w-ciw,stage_y+stage_draw_h-18,{200,220,255,255});
+        }
+        if (rt.turbo_mode) {
+            fillRect(renderer,stage_x+2,stage_y+2,62,16,{160,120,0,210});
+            if(font_small) renderText(renderer,font_small,"⚡ TURBO",
+                stage_x+4,stage_y+3,{255,240,80,255});
         }
 
         // ── نمایش Variable Monitor ها روی stage (draggable) ────────────────
