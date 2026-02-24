@@ -5,78 +5,83 @@
 #include "core_types.h"
 #include <vector>
 #include <string>
+#include <queue>
 
 using namespace std;
 
 enum RuntimeState { RUNTIME_STOPPED, RUNTIME_RUNNING, RUNTIME_PAUSED };
 
 struct ControlFrame {
-    int  blockId       = -1;
-    int  counter       = 0;
-    int  loop_target   = 0;
-    int  childHeadId   = -1;
-    int  after_loop_id = -1;
-    bool is_forever    = false;
-    bool is_wait       = false;
-    unsigned int wait_end_ms = 0;
+    int  blockId=-1, counter=0, loop_target=0, childHeadId=-1, after_loop_id=-1;
+    bool is_forever=false, is_wait=false;
+    unsigned int wait_end_ms=0;
 };
 
-// forward declares
 struct SensingManager;
 struct SoundManager;
 
-// ── SpriteRuntime: وضعیت اجرای یک sprite (یا clone) ─────────────────────────
+// ── SpriteRuntime ────────────────────────────────────────────────────────────
 struct SpriteRuntime {
-    int          sprite_id      = -1;   // id sprite اصلی
-    int          clone_id       = -1;   // -1 = sprite اصلی، >=0 = clone
-    int          currentBlockId = -1;
-    int          start_block_id = -1;   // when_start یا when_clone_start
-    RuntimeState state          = RUNTIME_STOPPED;
-    int          watchdogCounter = 0;
-    bool         is_clone       = false;
+    int          sprite_id=-1, clone_id=-1;
+    int          currentBlockId=-1, start_block_id=-1;
+    RuntimeState state=RUNTIME_STOPPED;
+    int          watchdogCounter=0;
+    bool         is_clone=false;
+    bool         waiting_for_answer=false;
+    bool         waiting_for_broadcast=false;
+    std::string  ask_question="";
     std::vector<ControlFrame> controlStack;
-    int          lastExecutedBlockId = -1;
-
-    // Ask/Answer: آیا این sprite در حال انتظار جواب است
-    bool         waiting_for_answer = false;
-    std::string  ask_question       = "";
+    int          lastExecutedBlockId=-1;
+    // step debugger: highlight این بلوک
+    int          step_highlight_id=-1;
 };
 
-// ── Clone: کپی runtime از یک sprite ─────────────────────────────────────────
+// ── Clone ────────────────────────────────────────────────────────────────────
 struct CloneSprite {
-    int     clone_id   = -1;    // شناسه منحصر به فرد
-    int     sprite_id  = -1;    // sprite اصلی
-    Sprite  data;               // کپی داده‌های sprite (x,y,dir,...)
+    int    clone_id=-1, sprite_id=-1;
+    Sprite data;
 };
 
-// ── Runtime کل پروژه ────────────────────────────────────────────────────────
-struct Runtime {
-    Project*                   project   = nullptr;
-    SensingManager*            sensing   = nullptr;
-    SoundManager*              sound_mgr = nullptr;
-    std::vector<SpriteRuntime> sprites;          // sprite های اصلی
-    std::vector<SpriteRuntime> clone_runtimes;   // runtime هر clone
-    std::vector<CloneSprite>   clones;           // داده‌های clone ها
-    RuntimeState               state     = RUNTIME_STOPPED;
-    int                        watchdogLimit = 100000;
+// ── Broadcast pending ────────────────────────────────────────────────────────
+struct BroadcastMsg {
+    std::string name;
+    bool        wait;   // broadcast and wait
+};
 
-    // Turbo Mode: چند tick در یک فریم
-    bool turbo_mode    = false;
-    int  turbo_ticks   = 30;    // تعداد tick در هر فریم در حالت turbo
+// ── Runtime ──────────────────────────────────────────────────────────────────
+struct Runtime {
+    Project*                   project=nullptr;
+    SensingManager*            sensing=nullptr;
+    SoundManager*              sound_mgr=nullptr;
+    std::vector<SpriteRuntime> sprites;
+    std::vector<SpriteRuntime> clone_runtimes;
+    std::vector<CloneSprite>   clones;
+    RuntimeState               state=RUNTIME_STOPPED;
+    int                        watchdogLimit=100000;
+
+    // Turbo
+    bool turbo_mode=false;
+    int  turbo_ticks=30;
 
     // Ask/Answer
-    bool        ask_active   = false;   // آیا dialog باز است
-    std::string ask_buffer   = "";      // متن تایپ‌شده
-    std::string answer       = "";      // آخرین جواب ذخیره‌شده
-    int         ask_sprite_id = -1;     // کدام sprite سوال پرسیده
-    int         ask_resume_block = -1;  // بعد از جواب به کجا برگردیم
+    bool        ask_active=false;
+    std::string ask_buffer="";
+    std::string answer="";
+    int         ask_sprite_id=-1, ask_resume_block=-1;
 
-    // Clone ID counter
-    int next_clone_id = 1;
+    // Broadcast queue
+    std::queue<BroadcastMsg> broadcast_queue;
+
+    // Step debugger
+    bool step_mode=false;         // یک tick در هر فریم و منتظر
+    bool step_pending=false;      // کاربر دکمه Step زده
+    int  step_highlight_block=-1; // بلوک در حال اجرا
+
+    // Clone
+    int next_clone_id=1;
 
     // backward compat
-    int currentBlockId      = -1;
-    int lastExecutedBlockId = -1;
+    int currentBlockId=-1, lastExecutedBlockId=-1;
     std::vector<ControlFrame> controlStack;
 };
 
@@ -93,11 +98,18 @@ void runtime_setWatchdogLimit(Runtime* rt, int limit);
 void runtime_start_sprite(Runtime* rt, int sprite_id);
 void runtime_stop_sprite(Runtime* rt, int sprite_id);
 
-// Clone API
+// Clone
 void runtime_create_clone(Runtime* rt, int sprite_id);
 void runtime_delete_clone(Runtime* rt, int clone_id);
 
-// Ask/Answer API
+// Ask/Answer
 void runtime_submit_answer(Runtime* rt, const std::string& ans);
 
-#endif // RUNTIME_H
+// Broadcast
+void runtime_broadcast(Runtime* rt, const std::string& msg_name, bool wait=false);
+void runtime_fire_event(Runtime* rt, const std::string& event_type, const std::string& param="");
+
+// Step
+void runtime_step(Runtime* rt);
+
+#endif

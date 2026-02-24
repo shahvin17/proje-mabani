@@ -113,12 +113,27 @@ static const std::vector<PaletteEntry> PALETTE_ENTRIES = {
     {"set_volume",      "set volume to 100%",     {100},   "Sound"},
     {"change_volume",   "change volume by -10",   {-10},   "Sound"},
     // Sensing (Ask)
-    {"ask",             "ask What's your name? and wait", {}, "Sensing"},
-    // Control (Clone)
-    {"create_clone",    "create clone of myself",  {-1},   "Control"},
-    {"when_clone_start","when I start as a clone",  {},    "Control"},
-    {"delete_clone",    "delete this clone",        {},    "Control"},
-    {"stop_this",       "stop this script",         {},    "Control"},
+    {"ask",              "ask What's your name? and wait", {}, "Sensing"},
+    // Control (Clone + Events)
+    {"create_clone",     "create clone of myself",   {-1},  "Control"},
+    {"when_clone_start", "when I start as a clone",  {},    "Control"},
+    {"delete_clone",     "delete this clone",        {},    "Control"},
+    {"stop_this",        "stop this script",         {},    "Control"},
+    // Events
+    {"when_key_pressed", "when [space] key pressed", {},    "Events"},
+    {"when_clicked",     "when this sprite clicked", {},    "Events"},
+    {"broadcast",        "broadcast [msg1]",         {},    "Events"},
+    {"broadcast_wait",   "broadcast [msg1] and wait",{},    "Events"},
+    {"when_receive",     "when I receive [msg1]",    {},    "Events"},
+    {"when_backdrop_switch","when backdrop switches to", {}, "Events"},
+    // Lists
+    {"list_add",         "add thing to [list1]",     {0,0}, "Variables"},
+    {"list_delete",      "delete 1 of [list1]",      {0,1}, "Variables"},
+    {"list_delete_all",  "delete all of [list1]",    {0},   "Variables"},
+    {"list_insert",      "insert thing at 1 of [list1]",{0,1,0},"Variables"},
+    {"list_replace",     "replace item 1 of [list1] with thing",{0,1,0},"Variables"},
+    {"list_show",        "show list [list1]",        {0},   "Variables"},
+    {"list_hide",        "hide list [list1]",        {0},   "Variables"},
     // Events
     {"when_start",      "when 🏁 clicked",        {},      "Events"},
     {"when_key",        "when space pressed",     {},      "Events"},
@@ -593,14 +608,12 @@ int main(int argc, char* argv[]) {
     auto setup_default_project = [&]() {
         project.sprites.clear();
         project.variables.clear();
-        // متغیر "answer" برای Ask block (پیش‌فرض، مخفی)
-        {
-            Variable ans_var;
-            ans_var.name    = "answer";
-            ans_var.value   = 0.0f;
-            ans_var.visible = false;
-            project.variables.push_back(ans_var);
-        }
+        project.lists.clear();
+        project.broadcasts.clear();
+        // متغیر "answer"
+        { Variable v; v.name="answer"; v.value=0; v.visible=false; project.variables.push_back(v); }
+        // پیش‌فرض broadcast message
+        { BroadcastDef bd; bd.name="message1"; bd.id=1; project.broadcasts.push_back(bd); }
         // Sprite1 پیش‌فرض
         Sprite spr;
         spr.id           = 1;
@@ -683,11 +696,12 @@ int main(int argc, char* argv[]) {
     // وسط: Run / Stop / Step
     SDL_Rect btn_run  = {WINDOW_W/2 - 60, 8, 52, 34};
     SDL_Rect btn_stop = {WINDOW_W/2 - 4,  8, 52, 34};
-    SDL_Rect btn_step  = {WINDOW_W/2 + 52, 8, 52, 34};
+    // btn_step moved below
     SDL_Rect btn_pause = {WINDOW_W/2 + 108, 8, 60, 34};
     SDL_Rect btn_undo  = {WINDOW_W/2 + 174, 8, 44, 34};
     SDL_Rect btn_redo  = {WINDOW_W/2 + 222, 8, 44, 34};
     SDL_Rect btn_turbo = {WINDOW_W/2 + 270, 8, 54, 34};
+    SDL_Rect btn_step  = {WINDOW_W/2 + 328, 8, 44, 34};
     // راست: New / Save / Load
     SDL_Rect btn_new  = {WINDOW_W - 195, 8, 55, 34};
     SDL_Rect btn_save = {WINDOW_W - 135, 8, 60, 34};
@@ -785,6 +799,18 @@ int main(int argc, char* argv[]) {
                 else if (SDL_PointInRect(&mp, &btn_turbo)) {
                     rt.turbo_mode = !rt.turbo_mode;
                     logInfo(rt.turbo_mode ? "Turbo ON (30x)" : "Turbo OFF");
+                }
+                else if (SDL_PointInRect(&mp, &btn_step)) {
+                    if (!rt.step_mode) {
+                        // فعال کردن step mode
+                        rt.step_mode = true;
+                        if (!runtime_isRunning(&rt)) runtime_start(&rt);
+                        logInfo("Step mode ON");
+                    } else {
+                        // یک قدم اجرا
+                        runtime_step(&rt);
+                        logInfo("Step → block " + std::to_string(rt.step_highlight_block));
+                    }
                 }
                 else if (SDL_PointInRect(&mp, &btn_save)) {
                     saveProjectAndMark(project, "project.fop");
@@ -1053,6 +1079,21 @@ int main(int argc, char* argv[]) {
                                     project.blocks.end());
                                 logInfo("Deleted block");
                             }
+                            else if (CTX_ITEMS[ci].action == 3 && cb) {
+                                // Add/Edit Comment
+                                if (cb->comment.empty())
+                                    cb->comment = "Comment...";
+                                else
+                                    cb->comment = "";  // toggle off
+                                project.isModified = true;
+                                logInfo("Comment toggled on block");
+                            }
+                            else if (CTX_ITEMS[ci].action == 4 && cb) {
+                                // Disable / Enable block
+                                cb->disabled = !cb->disabled;
+                                project.isModified = true;
+                                logInfo(cb->disabled ? "Block disabled" : "Block enabled");
+                            }
                             else if (CTX_ITEMS[ci].action == 5) {
                                 // Clean up: مرتب کردن بلوک‌های loose
                                 float cx = SIDEBAR_W + 30.f, cy = TOOLBAR_H + 30.f;
@@ -1112,6 +1153,22 @@ int main(int argc, char* argv[]) {
                     SDL_Rect submit_rect = {ax+aw-42, ay+4, 40, 40};
                     if (SDL_PointInRect(&mp, &submit_rect)) {
                         runtime_submit_answer(&rt, rt.ask_buffer);
+                    }
+                }
+                // --- Event: when_clicked (کلیک روی sprite) ---
+                else if (SDL_PointInRect(&mp, &area_stage) && !rt.ask_active) {
+                    // تبدیل stage coordinates به scratch coordinates
+                    float sx = (mx - g_stage_x - g_stage_w/2.0f) * 480.0f / g_stage_w;
+                    float sy = -(my - g_stage_y - g_stage_h/2.0f) * 360.0f / g_stage_h;
+                    // بررسی کلیک روی sprite
+                    for (auto& spr : project.sprites) {
+                        if (!spr.visible) continue;
+                        float hw=spr.width*spr.size_percent/200.f;
+                        float hh=spr.height*spr.size_percent/200.f;
+                        if (sx>=spr.x-hw&&sx<=spr.x+hw&&sy>=spr.y-hh&&sy<=spr.y+hh) {
+                            runtime_fire_event(&rt, "when_clicked", "");
+                            runtime_fire_event(&rt, "when_sprite_clicked", std::to_string(spr.id));
+                        }
                     }
                 }
                 // --- Variable Monitor drag (کلیک روی monitor روی stage) ---
@@ -1285,6 +1342,24 @@ int main(int argc, char* argv[]) {
                 int k2 = event.key.keysym.sym;
                 sense_update_key(sensing, k2, true);
 
+                // ── Event: when_key_pressed ──
+                {
+                    // تبدیل SDL keycode به نام کلید
+                    std::string kname = "";
+                    if(k2==SDLK_SPACE)     kname="space";
+                    else if(k2==SDLK_UP)   kname="up";
+                    else if(k2==SDLK_DOWN) kname="down";
+                    else if(k2==SDLK_LEFT) kname="left";
+                    else if(k2==SDLK_RIGHT)kname="right";
+                    else if(k2==SDLK_RETURN)kname="enter";
+                    else if(k2>=SDLK_a&&k2<=SDLK_z) kname=std::string(1,(char)k2);
+                    else if(k2>=SDLK_0&&k2<=SDLK_9) kname=std::string(1,(char)k2);
+                    if (!kname.empty()) {
+                        runtime_fire_event(&rt, "when_key_pressed", kname);
+                        runtime_fire_event(&rt, "when_key_pressed", "any");
+                    }
+                }
+
                 // ── Ask Dialog keyboard ──
                 if (rt.ask_active) {
                     if (k2 == SDLK_RETURN || k2 == SDLK_KP_ENTER) {
@@ -1295,13 +1370,17 @@ int main(int argc, char* argv[]) {
                         runtime_submit_answer(&rt, "");
                     }
                 } else if (k2 == SDLK_ESCAPE) {
-                    // ESC: بستن همه panel های باز
+                    // ESC: بستن همه panel ها و خروج از step mode
                     ui.show_context_menu     = false;
                     ui.show_backdrop_panel   = false;
                     ui.show_costume_editor   = false;
                     ui.show_extensions_panel = false;
                     ui.show_var_dialog       = false;
                     ui.editing_block_id      = -1;
+                    if (rt.step_mode) {
+                        rt.step_mode = false;
+                        logInfo("Step mode OFF");
+                    }
                 }
 
                 // ── Undo: Ctrl+Z ──
@@ -1650,6 +1729,27 @@ int main(int argc, char* argv[]) {
                 if (font_small) renderText(renderer, font_small, "Make a Variable",
                     mkvar_btn.x+8, mkvar_btn.y+7, {255,255,255,255});
                 py += 36;
+
+                // دکمه Make a List
+                SDL_Rect mklist_btn = {area_palette.x+6, py, PALETTE_W-12, 28};
+                fillRect(renderer,mklist_btn.x,mklist_btn.y,mklist_btn.w,mklist_btn.h,{180,100,200,255});
+                drawRect(renderer,mklist_btn.x,mklist_btn.y,mklist_btn.w,mklist_btn.h,{120,60,150,255});
+                if(font_small) renderText(renderer,font_small,"Make a List",
+                    mklist_btn.x+8,mklist_btn.y+7,{255,255,255,255});
+                py += 36;
+
+                // نمایش لیست‌های موجود
+                for (int li=0; li<(int)project.lists.size(); ++li) {
+                    auto& lst=project.lists[li];
+                    SDL_Rect lr={area_palette.x+6,py,PALETTE_W-12,22};
+                    fillRect(renderer,lr.x,lr.y,lr.w,lr.h,{160,90,190,255});
+                    if(font_small) renderText(renderer,font_small,
+                        lst.name+" ["+std::to_string(lst.items.size())+"]",
+                        lr.x+4,lr.y+3,{255,255,255,255});
+                    py+=26;
+                    if(py>area_palette.y+area_palette.h-10) break;
+                }
+
                 // نمایش متغیرهای موجود
                 for (auto& var : project.variables) {
                     std::string vline = var.name + " = " + std::to_string((int)var.value);
@@ -1703,18 +1803,48 @@ int main(int argc, char* argv[]) {
         for (auto& b : project.blocks) {
             if (ui.dragging_block && b.id == ui.dragging_block->id) continue;
 
-            bool highlighted = (b.id == rt.lastExecutedBlockId);
-            bool snap_target = (b.id == ui.snap_target_id);
+            bool highlighted  = (b.id == rt.lastExecutedBlockId);
+            bool step_active  = (b.id == rt.step_highlight_block) && rt.step_mode;
+            bool snap_target  = (b.id == ui.snap_target_id);
+            bool is_disabled  = b.disabled;
 
             SDL_Color col = colorForBlockType(b.type);
+            // disabled: رنگ خاموش
+            if (is_disabled) {
+                col.r = (Uint8)(col.r*0.4f); col.g=(Uint8)(col.g*0.4f); col.b=(Uint8)(col.b*0.4f);
+            }
             if (snap_target) {
-                col.r = std::min(col.r+50, 255);
-                col.g = std::min(col.g+50, 255);
-                col.b = std::min(col.b+50, 255);
+                col.r=std::min(col.r+50,255); col.g=std::min(col.g+50,255); col.b=std::min(col.b+50,255);
+            }
+            // step highlight: چشمک زرد-سبز
+            if (step_active) {
+                bool blink = (SDL_GetTicks()/200)%2;
+                col = blink ? SDL_Color{60,220,120,255} : SDL_Color{200,255,100,255};
             }
 
             renderBlock(renderer, (int)b.x, (int)b.y, (int)b.width, (int)b.height,
-                        col, highlighted);
+                        col, highlighted || step_active);
+
+            // Comment bubble
+            if (!b.comment.empty()) {
+                int cx = (int)b.x + (int)b.width + 4;
+                int cy = (int)b.y;
+                int cw = std::min((int)b.comment.size()*7+12, 150);
+                fillRect(renderer, cx, cy, cw, 22, {255,255,200,230});
+                drawRect(renderer, cx, cy, cw, 22, {200,200,80,255});
+                // خط اتصال
+                SDL_SetRenderDrawColor(renderer,200,200,80,200);
+                SDL_RenderDrawLine(renderer,(int)b.x+(int)b.width,cy+11,cx,cy+11);
+                if (font_small) renderText(renderer,font_small,b.comment,cx+4,cy+4,{60,60,0,255});
+            }
+            // disabled overlay
+            if (is_disabled) {
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                SDL_SetRenderDrawColor(renderer,0,0,0,80);
+                SDL_Rect ov={(int)b.x,(int)b.y,(int)b.width,(int)b.height};
+                SDL_RenderFillRect(renderer,&ov);
+                SDL_SetRenderDrawBlendMode(renderer,SDL_BLENDMODE_BLEND);
+            }
 
             // رندر label — محدود به فضای قبل از input fields
             if (font_small) {
@@ -2097,6 +2227,18 @@ int main(int argc, char* argv[]) {
             SDL_Rect overlay={0,0,WINDOW_W,WINDOW_H};
             SDL_RenderFillRect(renderer,&overlay);
             // blend mode restored automatically
+        // دکمه Step ▶| (Step Debugger)
+        {
+            bool sm = rt.step_mode;
+            SDL_Color sc = sm ? SDL_Color{40,160,120,255} : SDL_Color{50,55,65,255};
+            fillRect(renderer, btn_step.x, btn_step.y, btn_step.w, btn_step.h, sc);
+            drawRect(renderer, btn_step.x, btn_step.y, btn_step.w, btn_step.h,
+                sm?SDL_Color{60,220,160,255}:SDL_Color{90,100,120,255});
+            if(font_small) renderText(renderer, font_small,
+                sm ? "▶|" : "▶|",
+                btn_step.x+8, btn_step.y+11,
+                sm?SDL_Color{255,255,255,255}:SDL_Color{140,150,160,255});
+        }
 
             int ep_w=380, ep_h=(int)EXTENSIONS.size()*70+70;
             int ep_x=WINDOW_W/2-ep_w/2, ep_y=WINDOW_H/2-ep_h/2;
@@ -2282,6 +2424,35 @@ int main(int argc, char* argv[]) {
             if (font_small)
                 renderText(renderer, font_small, "👔 Costumes",
                     cs_btn.x+4, cs_btn.y+5, {220,200,255,255});
+        }
+
+        // ── List Variable Monitor ها روی stage ──────────────────────────────
+        for (int li=0; li<(int)project.lists.size(); ++li) {
+            auto& lst = project.lists[li];
+            if (!lst.visible) continue;
+            int lx = stage_x + (int)lst.monitor_x;
+            int ly = stage_y + (int)lst.monitor_y;
+            int lw = (int)lst.monitor_w, lh=(int)lst.monitor_h;
+            // بدنه
+            fillRect(renderer,lx,ly,lw,lh,{220,240,255,230});
+            drawRect(renderer,lx,ly,lw,lh,{80,120,200,255});
+            // عنوان
+            fillRect(renderer,lx,ly,lw,18,{76,130,218,255});
+            if(font_small) renderText(renderer,font_small,lst.name,lx+3,ly+2,{255,255,255,255});
+            // آیتم‌ها
+            int iy=ly+20;
+            for(int ii=0;ii<(int)lst.items.size()&&iy<ly+lh-4;++ii){
+                // شماره
+                fillRect(renderer,lx+2,iy,20,14,{180,200,240,200});
+                if(font_small) renderText(renderer,font_small,std::to_string(ii+1),lx+4,iy+1,{60,80,140,255});
+                // مقدار
+                if(font_small) renderText(renderer,font_small,lst.items[ii],lx+25,iy+1,{20,40,100,255});
+                iy+=16;
+            }
+            // تعداد
+            std::string cnt = "length "+std::to_string(lst.items.size());
+            fillRect(renderer,lx,ly+lh-16,lw,16,{160,190,230,200});
+            if(font_small) renderText(renderer,font_small,cnt,lx+3,ly+lh-14,{40,60,120,255});
         }
 
         // ── Clone counter و Turbo indicator روی stage ────────────────────────
