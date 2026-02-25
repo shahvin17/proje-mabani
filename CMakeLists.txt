@@ -55,7 +55,6 @@ set(APP_SOURCES
     src/sensing.cpp
     src/logger.cpp
     src/sound.cpp
-    src/ui_drag.cpp
 )
 
 # ── Executable ────────────────────────────────────────────────────────────────

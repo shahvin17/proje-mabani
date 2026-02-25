@@ -235,6 +235,40 @@ static void execBlock(Runtime* rt, SpriteRuntime& sr, Block* block){
     }
     else if(t=="delete_clone"){ if(sr.is_clone){ runtime_delete_clone(rt,sr.clone_id); return; } }
 
+    // ── My Blocks / Custom Function Call ─────────────────────────────────────
+    else if(t=="call_func") {
+        // inputs[0] = func id
+        int fid = block->inputs.empty() ? -1 : block->inputs[0];
+        FuncDef* fd = nullptr;
+        for(auto& f : rt->project->funcs) if(f.id==fid){ fd=&f; break; }
+        if(fd && fd->body_start != -1) {
+            // push return address به control stack
+            ControlFrame cf;
+            cf.blockId     = block->id;
+            cf.after_loop_id = block->nextBlockId;  // برگشت به اینجا بعد از تابع
+            cf.is_forever  = false;
+            cf.is_wait     = false;
+            cf.childHeadId = -1;
+            sr.controlStack.push_back(cf);
+            // پرش به بدنه تابع
+            sr.currentBlockId = fd->body_start;
+            std::cout<<"[Func] Call: "<<fd->name<<" body="<<fd->body_start<<"\n";
+            return;
+        }
+        // تابع پیدا نشد → ادامه
+    }
+    else if(t=="func_return" || t=="define_func") {
+        // برگشت از تابع: pop control stack
+        if(!sr.controlStack.empty() && sr.controlStack.back().after_loop_id != -1) {
+            int ret = sr.controlStack.back().after_loop_id;
+            sr.controlStack.pop_back();
+            sr.currentBlockId = ret;
+            return;
+        }
+        sr.state = RUNTIME_STOPPED;
+        return;
+    }
+
     // ── Control ──
     else if(t=="wait"){
         float secs=block->inputs.empty()?1.f:(float)block->inputs[0];

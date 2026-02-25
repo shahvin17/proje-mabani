@@ -59,6 +59,7 @@ static std::vector<CategoryInfo> CATEGORIES = {  // non-const برای Extension
     {"Operators", {89,  192,  89, 255}},
     {"Variables", {255, 140,  26, 255}},
     {"Pen",       {0,   200, 100, 255}},
+    {"My Blocks", {255,  80, 120, 255}},
 };
 
 // Extensions available
@@ -126,6 +127,10 @@ static const std::vector<PaletteEntry> PALETTE_ENTRIES = {
     {"broadcast_wait",   "broadcast [msg1] and wait",{},    "Events"},
     {"when_receive",     "when I receive [msg1]",    {},    "Events"},
     {"when_backdrop_switch","when backdrop switches to", {}, "Events"},
+    // My Blocks
+    {"define_func",      "define myBlock",            {},    "My Blocks"},
+    {"call_func",        "call myBlock",              {0},   "My Blocks"},
+    {"func_return",      "return from block",         {},    "My Blocks"},
     // Lists
     {"list_add",         "add thing to [list1]",     {0,0}, "Variables"},
     {"list_delete",      "delete 1 of [list1]",      {0,1}, "Variables"},
@@ -445,6 +450,13 @@ struct UIState {
         redo_stack.clear();
     }
 
+    // ── My Blocks / Custom Functions ─────────────────────────────────────
+    bool        show_myblocks_panel = false;
+    bool        show_def_dialog     = false;  // dialog ساخت تابع جدید
+    std::string new_func_name       = "";
+    int         editing_func_id     = -1;     // تابع در حال ویرایش
+    int         next_func_id        = 1;      // counter برای ID
+
     // ── Right-click Context Menu ──────────────────────────────────────────
     bool   show_context_menu  = false;
     int    ctx_block_id       = -1;    // بلوک زیر راست-کلیک
@@ -610,6 +622,7 @@ int main(int argc, char* argv[]) {
         project.variables.clear();
         project.lists.clear();
         project.broadcasts.clear();
+        project.funcs.clear();
         // متغیر "answer"
         { Variable v; v.name="answer"; v.value=0; v.visible=false; project.variables.push_back(v); }
         // پیش‌فرض broadcast message
@@ -903,6 +916,63 @@ int main(int argc, char* argv[]) {
                             project.isModified=true;
                             logInfo("Added backdrop: "+nb.name);
                         }
+                    }
+                }
+                // --- My Blocks dialog click ---
+                else if (ui.show_def_dialog) {
+                    int dw=380,dh=260,dx=(WINDOW_W-dw)/2,dy=(WINDOW_H-dh)/2;
+                    // X بستن
+                    SDL_Rect xb={dx+dw-32,dy+6,26,28};
+                    if(SDL_PointInRect(&mp,&xb)){
+                        ui.show_def_dialog=false; ui.new_func_name="";
+                    }
+                    // OK
+                    SDL_Rect ok_btn={dx+dw/2-60,dy+dh-52,120,36};
+                    if(SDL_PointInRect(&mp,&ok_btn) && !ui.new_func_name.empty()){
+                        // تعریف تابع جدید
+                        FuncDef fd;
+                        fd.id=ui.next_func_id++;
+                        fd.name=ui.new_func_name;
+                        fd.sprite_owner=ui.active_sprite_id;
+                        fd.body_start=-1;
+                        // اضافه کردن پارامتر عددی پیش‌فرض
+                        FuncParam p; p.name="num"; p.type="number"; p.default_val=0;
+                        fd.params.push_back(p);
+                        project.funcs.push_back(fd);
+                        project.isModified=true;
+
+                        // ساختن define_func block در canvas
+                        Block def_blk;
+                        def_blk.id=next_block_id++;
+                        def_blk.type="define_func";
+                        def_blk.sprite_owner=ui.active_sprite_id;
+                        def_blk.str_param=fd.name;
+                        def_blk.inputs={fd.id};
+                        def_blk.x=float(SIDEBAR_W+40+(project.funcs.size()-1)*220);
+                        def_blk.y=float(TOOLBAR_H+40);
+                        def_blk.width=200; def_blk.height=64;
+                        project.blocks.push_back(def_blk);
+                        // لینک body_start به بلوک بعدی define
+                        project.funcs.back().body_start=def_blk.id;
+
+                        logInfo("Created function: "+fd.name);
+                        ui.show_def_dialog=false; ui.new_func_name="";
+                        ui.active_category="My Blocks";  // برو به My Blocks palette
+                    }
+                    // Cancel
+                    SDL_Rect cancel_btn={dx+dw/2+68,dy+dh-52,80,36};
+                    if(SDL_PointInRect(&mp,&cancel_btn)){
+                        ui.show_def_dialog=false; ui.new_func_name="";
+                    }
+                }
+                // --- Make a Block button در palette ---
+                else if (ui.active_category == "My Blocks") {
+                    // بررسی کلیک روی Make a Block button
+                    // py محلی نیست اینجا، پس مستقیم بررسی می‌کنیم
+                    SDL_Rect mkblk={area_palette.x+6, area_palette.y+BLOCK_H, PALETTE_W-12, 32};
+                    if(SDL_PointInRect(&mp,&mkblk)){
+                        ui.show_def_dialog=true;
+                        ui.new_func_name="";
                     }
                 }
                 // --- Costume Panel کلیک ها ---
@@ -1204,6 +1274,12 @@ int main(int argc, char* argv[]) {
                         nb.id      = next_block_id++;
                         nb.type    = pe->type;
                         nb.inputs  = pe->default_inputs;
+                        nb.sprite_owner = ui.active_sprite_id;
+                        // My Blocks: اگه call_func بود اولین func این sprite رو ست کن
+                        if (nb.type == "call_func") {
+                            for(auto& fd : project.funcs)
+                                if(fd.sprite_owner==ui.active_sprite_id){ nb.inputs={fd.id}; break; }
+                        }
                         nb.nextBlockId = -1;
                         nb.x       = (float)(mx - BLOCK_W/2);
                         nb.y       = (float)(my - BLOCK_H/2);
@@ -1368,6 +1444,29 @@ int main(int argc, char* argv[]) {
                         rt.ask_buffer.pop_back();
                     } else if (k2 == SDLK_ESCAPE) {
                         runtime_submit_answer(&rt, "");
+                    }
+                } else if (ui.show_def_dialog) {
+                    if (k2 == SDLK_BACKSPACE && !ui.new_func_name.empty())
+                        ui.new_func_name.pop_back();
+                    else if (k2 == SDLK_RETURN && !ui.new_func_name.empty()) {
+                        // Enter = OK: ساختن تابع (مشابه click OK)
+                        FuncDef fd; fd.id=ui.next_func_id++; fd.name=ui.new_func_name;
+                        fd.sprite_owner=ui.active_sprite_id; fd.body_start=-1;
+                        FuncParam p; p.name="num"; p.type="number"; fd.params.push_back(p);
+                        project.funcs.push_back(fd);
+                        Block def_blk; def_blk.id=next_block_id++;
+                        def_blk.type="define_func"; def_blk.sprite_owner=ui.active_sprite_id;
+                        def_blk.str_param=fd.name; def_blk.inputs={fd.id};
+                        def_blk.x=float(SIDEBAR_W+40); def_blk.y=float(TOOLBAR_H+40);
+                        def_blk.width=200; def_blk.height=64;
+                        project.funcs.back().body_start=def_blk.id;
+                        project.blocks.push_back(def_blk);
+                        project.isModified=true;
+                        logInfo("Created function via Enter: "+fd.name);
+                        ui.show_def_dialog=false; ui.new_func_name="";
+                        ui.active_category="My Blocks";
+                    } else if (k2 == SDLK_ESCAPE) {
+                        ui.show_def_dialog=false; ui.new_func_name="";
                     }
                 } else if (k2 == SDLK_ESCAPE) {
                     // ESC: بستن همه panel ها و خروج از step mode
@@ -1541,6 +1640,10 @@ int main(int argc, char* argv[]) {
                 // ── Ask dialog: تایپ متن ──
                 if (rt.ask_active) {
                     rt.ask_buffer += event.text.text;
+                }
+                // ── My Blocks dialog ──
+                else if (ui.show_def_dialog) {
+                    ui.new_func_name += event.text.text;
                 }
                 else if (ui.show_var_dialog) {
                     for (char c : std::string(event.text.text))
@@ -1720,6 +1823,36 @@ int main(int argc, char* argv[]) {
             int py = area_palette.y + 36;
 
             // دکمه "Make a Variable" در بالای Variables palette
+            if (ui.active_category == "My Blocks") {
+                // ── دکمه Make a Block ──────────────────────────────────────
+                SDL_Rect mkblk_btn = {area_palette.x+6, py, PALETTE_W-12, 32};
+                fillRect(renderer, mkblk_btn.x, mkblk_btn.y, mkblk_btn.w, mkblk_btn.h, {220,60,100,255});
+                drawRect(renderer, mkblk_btn.x, mkblk_btn.y, mkblk_btn.w, mkblk_btn.h, {255,100,140,255});
+                if(font_bold) renderText(renderer,font_bold,"+ Make a Block",
+                    mkblk_btn.x+10, mkblk_btn.y+8, {255,255,255,255});
+                py += 40;
+
+                // ── لیست توابع تعریف‌شده ─────────────────────────────────
+                for(auto& fd : project.funcs) {
+                    if(fd.sprite_owner != ui.active_sprite_id) continue;
+                    SDL_Rect fr = {area_palette.x+6, py, PALETTE_W-12, 28};
+                    fillRect(renderer, fr.x, fr.y, fr.w, fr.h, {200,50,90,255});
+                    drawRect(renderer, fr.x, fr.y, fr.w, fr.h, {255,80,120,255});
+                    // نام تابع
+                    std::string flabel = fd.name;
+                    for(auto& p : fd.params) flabel += " ["+p.name+"]";
+                    if(font_small) renderText(renderer,font_small,flabel,
+                        fr.x+6, fr.y+7, {255,255,255,255});
+                    // دکمه ویرایش (خال کوچک)
+                    SDL_Rect edit_btn = {fr.x+fr.w-20, fr.y+4, 16, 20};
+                    fillRect(renderer, edit_btn.x, edit_btn.y, edit_btn.w, edit_btn.h, {160,30,70,255});
+                    if(font_small) renderText(renderer,font_small,"✎",
+                        edit_btn.x+2, edit_btn.y+3, {255,200,200,255});
+                    py += 32;
+                    if(py > area_palette.y+area_palette.h-20) break;
+                }
+            }
+
             if (ui.active_category == "Variables") {
                 SDL_Rect mkvar_btn = {area_palette.x+6, py, PALETTE_W-12, 28};
                 fillRect(renderer, mkvar_btn.x, mkvar_btn.y, mkvar_btn.w, mkvar_btn.h,
@@ -1807,8 +1940,11 @@ int main(int argc, char* argv[]) {
             bool step_active  = (b.id == rt.step_highlight_block) && rt.step_mode;
             bool snap_target  = (b.id == ui.snap_target_id);
             bool is_disabled  = b.disabled;
+            bool is_define    = (b.type == "define_func");
 
             SDL_Color col = colorForBlockType(b.type);
+            // define_func: رنگ ویژه My Blocks
+            if (is_define) col = {220, 50, 90, 255};
             // disabled: رنگ خاموش
             if (is_disabled) {
                 col.r = (Uint8)(col.r*0.4f); col.g=(Uint8)(col.g*0.4f); col.b=(Uint8)(col.b*0.4f);
@@ -1824,6 +1960,30 @@ int main(int argc, char* argv[]) {
 
             renderBlock(renderer, (int)b.x, (int)b.y, (int)b.width, (int)b.height,
                         col, highlighted || step_active);
+
+            // My Blocks define label: نام تابع + پارامترها
+            if (is_define) {
+                std::string flabel = "define ";
+                // پیدا کردن FuncDef متناظر
+                int fid = b.inputs.empty() ? -1 : b.inputs[0];
+                for(auto& fd : project.funcs) {
+                    if(fd.id==fid){
+                        flabel += fd.name;
+                        for(auto& p : fd.params)
+                            flabel += " ["+p.name+"]";
+                        break;
+                    }
+                }
+                // حباب hat
+                fillRect(renderer,(int)b.x+4,(int)b.y-14,(int)b.width-8,18,{200,40,80,255});
+                drawRect(renderer,(int)b.x+4,(int)b.y-14,(int)b.width-8,18,{255,80,120,180});
+                if(font_small) renderText(renderer,font_small,flabel,
+                    (int)b.x+8,(int)b.y-12,{255,230,235,255});
+                // آیکون ⚙
+                fillRect(renderer,(int)b.x+4,(int)b.y+4,22,22,{255,80,120,255});
+                if(font_small) renderText(renderer,font_small,"⚙",
+                    (int)b.x+6,(int)b.y+6,{255,255,255,255});
+            }
 
             // Comment bubble
             if (!b.comment.empty()) {
@@ -2104,6 +2264,67 @@ int main(int argc, char* argv[]) {
                 renderText(renderer, font_small, status,
                     area_stage.x+8, info_y + line_h*3, sc);
             }
+        }
+
+        // ── My Blocks: ساخت تابع جدید (dialog) ─────────────────────────────
+        if (ui.show_def_dialog) {
+            int dw=380, dh=260;
+            int dx=(WINDOW_W-dw)/2, dy=(WINDOW_H-dh)/2;
+            // سایه
+            fillRect(renderer,dx+4,dy+4,dw,dh,{0,0,0,120});
+            // بدنه
+            fillRect(renderer,dx,dy,dw,dh,{28,24,42,252});
+            drawRect(renderer,dx,dy,dw,dh,{220,60,100,255});
+            // عنوان
+            fillRect(renderer,dx,dy,dw,40,{180,40,80,255});
+            if(font_bold) renderText(renderer,font_bold,"Make a Block",
+                dx+12,dy+10,{255,255,255,255});
+            // X
+            fillRect(renderer,dx+dw-32,dy+6,26,28,{120,20,50,255});
+            if(font_bold) renderText(renderer,font_bold,"X",dx+dw-22,dy+10,{255,200,200,255});
+
+            // فیلد نام
+            if(font_small) renderText(renderer,font_small,"Block name:",dx+12,dy+54,{200,180,210,255});
+            SDL_Rect name_field={dx+12,dy+70,dw-24,32};
+            fillRect(renderer,name_field.x,name_field.y,name_field.w,name_field.h,{255,255,255,255});
+            drawRect(renderer,name_field.x,name_field.y,name_field.w,name_field.h,{220,60,100,255});
+            std::string disp = ui.new_func_name;
+            if((SDL_GetTicks()/500)%2==0) disp+="|";
+            if(font_small) renderText(renderer,font_small,
+                disp.empty()?"myBlock...":disp,
+                name_field.x+6,name_field.y+8,
+                ui.new_func_name.empty()?SDL_Color{160,140,160,255}:SDL_Color{20,10,40,255});
+
+            // پارامترها (ساده - فقط یک پارامتر عددی)
+            if(font_small) renderText(renderer,font_small,
+                "Parameters: number input (optional)",dx+12,dy+115,{180,160,190,255});
+
+            // checkbox add number input
+            SDL_Rect cb={dx+14,dy+135,18,18};
+            fillRect(renderer,cb.x,cb.y,cb.w,cb.h,{50,40,60,255});
+            drawRect(renderer,cb.x,cb.y,cb.w,cb.h,{200,80,120,255});
+            if(font_small) renderText(renderer,font_small,"✓",cb.x+3,cb.y+1,{200,80,120,255});
+            if(font_small) renderText(renderer,font_small,"Add a number input",
+                cb.x+24,cb.y+2,{200,185,210,255});
+
+            // دکمه OK
+            SDL_Rect ok_btn={dx+dw/2-60,dy+dh-52,120,36};
+            fillRect(renderer,ok_btn.x,ok_btn.y,ok_btn.w,ok_btn.h,{60,180,80,255});
+            drawRect(renderer,ok_btn.x,ok_btn.y,ok_btn.w,ok_btn.h,{100,220,120,255});
+            if(font_bold) renderText(renderer,font_bold,"OK",
+                ok_btn.x+46,ok_btn.y+9,{255,255,255,255});
+
+            // دکمه Cancel
+            SDL_Rect cancel_btn={dx+dw/2+68,dy+dh-52,80,36};
+            fillRect(renderer,cancel_btn.x,cancel_btn.y,cancel_btn.w,cancel_btn.h,{80,40,60,255});
+            drawRect(renderer,cancel_btn.x,cancel_btn.y,cancel_btn.w,cancel_btn.h,{140,60,90,255});
+            if(font_small) renderText(renderer,font_small,"Cancel",
+                cancel_btn.x+12,cancel_btn.y+11,{200,180,190,255});
+
+            // نمایش توابع موجود (پریویو)
+            if(font_small) renderText(renderer,font_small,
+                std::to_string(project.funcs.size())+" block(s) defined",
+                dx+12,dy+dh-16,{140,120,150,255});
         }
 
         // ── Backdrop Chooser Panel ───────────────────────────────────────────

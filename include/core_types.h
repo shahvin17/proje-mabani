@@ -80,6 +80,21 @@ struct ListVar {
     float  monitor_h = 160.0f;
 };
 
+// ── My Blocks / Custom Function ──────────────────────────────────────────────
+struct FuncParam {
+    std::string name;
+    std::string type;   // "number", "boolean", "string"
+    float default_val = 0.0f;
+};
+
+struct FuncDef {
+    int         id          = -1;
+    std::string name        = "myBlock";
+    std::vector<FuncParam> params;
+    int         body_start  = -1;   // id اولین بلوک داخل تابع
+    int         sprite_owner = -1;
+};
+
 // ── Broadcast message ────────────────────────────────────────────────────────
 struct BroadcastDef {
     string name;   // e.g. "game over"
@@ -94,6 +109,7 @@ struct Project {
     vector<ListVar>      lists;
     vector<Backdrop>     backdrops;
     vector<BroadcastDef> broadcasts;
+    vector<FuncDef>      funcs;
     int  active_backdrop_idx = 0;
     bool isModified          = false;
     PenCanvas pen_canvas;
